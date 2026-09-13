@@ -1,0 +1,193 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>17.0</VCProjectVersion>
+    <Keyword>Win32Proj</Keyword>
+    <ProjectGuid>{A54F126D-DB2F-438A-AF21-27EF4C962CB7}</ProjectGuid>
+    <RootNamespace>AA</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>MultiByte</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings" />
+  <ImportGroup Label="Shared" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Platform)'=='Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Platform)'=='x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup>
+    <OutDir>$(ProjectDir)..\..\..\bin\</OutDir>
+    <TargetName>AA</TargetName>
+    <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
+    <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <IntDir>$(ProjectDir)..\..\..\_build\x86\Debug\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <IntDir>$(ProjectDir)..\..\..\_build\x86\Release\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <IntDir>$(ProjectDir)..\..\..\_build\x64\Debug\</IntDir>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <IntDir>$(ProjectDir)..\..\..\_build\x64\Release\</IntDir>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>AP_WIN;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>Disabled</Optimization>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ProgramDataBaseFileName>$(IntDir)AGENT-$(Platform)-$(Configuration)-compile.pdb</ProgramDataBaseFileName>
+      <CompileAs>CompileAsC</CompileAs>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)AA.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(IntDir)AA.lib</ImportLibrary>
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
+    <ClCompile>
+      <WarningLevel>Level3</WarningLevel>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>AP_WIN;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <ProgramDataBaseFileName>$(IntDir)AGENT-$(Platform)-$(Configuration)-compile.pdb</ProgramDataBaseFileName>
+      <CompileAs>CompileAsC</CompileAs>
+      <MultiProcessorCompilation>true</MultiProcessorCompilation>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <!-- Original address-named callbacks remain distinct even when their
+           instruction bodies are identical; callback tables observe identity. -->
+      <EnableCOMDATFolding>false</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <LinkTimeCodeGeneration>UseLinkTimeCodeGeneration</LinkTimeCodeGeneration>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <ProgramDatabaseFile>$(IntDir)AA.pdb</ProgramDatabaseFile>
+      <ImportLibrary>$(IntDir)AA.lib</ImportLibrary>
+      <AdditionalDependencies>winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\audio\spu_core.c" />
+    <ClCompile Include="..\..\audio\vab.c" />
+    <ClCompile Include="..\..\audio\audio_runtime.c" />
+    <ClCompile Include="..\..\audio\ima_adpcm.c" />
+    <ClCompile Include="..\..\audio\psyq_sound.c" />
+    <ClCompile Include="..\..\audio\game_sound.c" />
+    <ClCompile Include="..\..\animation.c" />
+    <ClCompile Include="..\..\industry.c" />
+    <ClCompile Include="..\..\radar_death.c" />
+    <ClCompile Include="..\..\mini_gyro.c" />
+    <ClCompile Include="..\..\resque_tanya.c" />
+    <ClCompile Include="..\..\camera.c" />
+    <ClCompile Include="..\..\cc_archive.c" />
+    <ClCompile Include="..\..\code_module.c" />
+    <ClCompile Include="..\..\collision.c" />
+    <ClCompile Include="..\..\effect_update.c" />
+    <ClCompile Include="..\..\game_loop.c" />
+    <ClCompile Include="..\..\global.c" />
+    <ClCompile Include="..\..\render.c" />
+    <ClCompile Include="..\..\sprite.c" />
+    <ClCompile Include="..\..\v2.c" />
+    <ClCompile Include="..\..\truck.c" />
+    <ClCompile Include="..\..\player.c" />
+    <ClCompile Include="..\..\projectile.c" />
+    <ClCompile Include="..\..\spatial.c" />
+    <ClCompile Include="..\..\map.c" />
+    <ClCompile Include="..\..\object.c" />
+    <ClCompile Include="..\..\mission.c" />
+    <ClCompile Include="..\..\hq.c" />
+    <ClCompile Include="..\..\airship.c" />
+    <ClCompile Include="..\..\memory_card_platform.c" />
+    <ClCompile Include="..\..\input_record.c" />
+    <ClCompile Include="..\..\level_data.c" />
+    <ClCompile Include="..\..\main.c" />
+    <ClCompile Include="..\..\mechanoid.c" />
+    <ClCompile Include="..\..\model.c" />
+    <ClCompile Include="..\..\original_file.c" />
+    <ClCompile Include="..\..\original_tables.c" />
+    <ClCompile Include="..\..\psx.c">
+      <ObjectFileName>$(IntDir)psx_core.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\random.c" />
+    <ClCompile Include="..\..\resource_table.c" />
+    <ClCompile Include="..\..\scuba_player.c" />
+    <ClCompile Include="..\..\runtime_heap.c" />
+    <ClCompile Include="..\..\stubs.c" />
+    <ClCompile Include="..\..\cd.c" />
+    <ClCompile Include="..\..\text_renderer.c" />
+    <ClCompile Include="..\..\tank.c" />
+    <ClCompile Include="..\..\gyro.c" />
+    <ClCompile Include="..\..\gunship.c" />
+    <ClCompile Include="..\..\vram_alloc.c" />
+    <ClCompile Include="input.c" />
+    <ClCompile Include="audio_waveout.c" />
+    <ClCompile Include="platform_file.c" />
+    <ClCompile Include="game_platform.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\animation.h" />
+    <ClInclude Include="..\..\airship.h" />
+    <ClInclude Include="..\..\app.h" />
+    <ClInclude Include="..\..\cc_archive.h" />
+    <ClInclude Include="..\..\cd.h" />
+    <ClInclude Include="..\..\code_module.h" />
+    <ClInclude Include="..\..\model.h" />
+    <ClInclude Include="..\..\mechanoid.h" />
+    <ClInclude Include="..\..\original_tables.h" />
+    <ClInclude Include="..\..\psx.h" />
+    <ClInclude Include="..\..\scuba_player.h" />
+    <ClInclude Include="game_platform.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets" />
+</Project>
