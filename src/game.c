@@ -1,8 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "cc_archive.h"
 #include "cd.h"
@@ -19,8 +18,8 @@
 #include "mission.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/platform_file.h"
+#include "game_runtime.h"
+#include "game_file.h"
 #include "player.h"
 #include "psx.h"
 #include "random.h"
@@ -131,7 +130,7 @@ GDB_CALL sint32 boot_language_text_load(void)
         sound_map_reset();
         game_file_read("SOUND\\VH.CC", g_sound_archive);
         SsInit();
-        SsSetTickMode(1);
+        SsSetTickMode(SS_TICK60);
         SsStart();
         sound_bank_load(0x11, 0);
         vram_clear();
@@ -153,7 +152,7 @@ GDB_CALL sint32 boot_language_text_load(void)
         language = 1;
 #endif
         SsEnd();
-        spu_shutdown();
+        sound_system_shutdown();
         if (language == 0)
             language = 1;
         if (language == 1)
@@ -198,23 +197,25 @@ static void mission_launch_trace(const char *event)
     fclose(trace);
 }
 
-sint32 main(void)
+// XPORT REVISION: 2026-09-24T16:58:21Z
+int xport_main(int argc, char **argv)
 {
     uint32 packed;
     uint16 *env;
     uint16 tpage;
     sint32 musicId;
 
+    game_runtime_configure();
+
     if (!ot_depth_run_self_tests())
     {
         fprintf(stderr, "OT depth arithmetic self-test failed\n");
         return 2;
     }
-    g_initial_stack_pointer = 0; /* PSX stack snapshot has no Windows equivalent. */
+    g_initial_stack_pointer = 0; /* PSX stack snapshot has no native equivalent */
     ResetCallback();
-    /* Windows port: files are read synchronously by platform_file.c. */
+    /* Native files are read synchronously by game_file.c */
     PadInit(0);
-    psx_game_platform_configure();
     ResetGraph(0);
     SetGraphDebug(0);
     InitGeom();
@@ -255,7 +256,7 @@ sint32 main(void)
     }
 
     /* Session loop: FMV / load / run / tear down sound, then restart. */
-    while (!psx_quit_requested())
+    while (!xport_isquit())
     {
         g_iterations += 1;
         printf("**** ITERATIONS = %d ****\n", g_iterations);
@@ -417,7 +418,6 @@ sint32 main(void)
         g_scene_far_z = g_map_depth_cells * 0xC000;
         g_runtime_scratch_buffer_a = runtime_heap_allocate(0x100);
         g_runtime_scratch_buffer_b = runtime_heap_allocate(0x100);
-        SsSetSerialAttr(0, 0, 1);
         g_same_stage_selected = 0;
 
         if (g_next_stage_index == STAGE_SPECIAL || g_next_stage_index == STAGE_HUB)
@@ -457,7 +457,7 @@ sint32 main(void)
             sprite_assign_clut_range(0x27000, 3, tpage);
             effects_spawn_initial();
             hq_level_update();
-            if (psx_quit_requested())
+            if (xport_isquit())
                 break;
         }
         else
@@ -540,7 +540,7 @@ sint32 main(void)
         }
 
         SsEnd();
-        spu_shutdown();
+        sound_system_shutdown();
         DrawSync(0);
         if (g_input_recording_mode == 1)
         {

@@ -1,7 +1,8 @@
 #ifndef MODULE_API_RADAR_DEATH_H
 #define MODULE_API_RADAR_DEATH_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "map.h"

@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "cc_archive.h"
 #include "global.h"
 #include "object.h"
 #include "original_tables.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "player.h"
 #include "psx.h"
 #include "resource_table.h"
@@ -68,7 +67,7 @@ static void upload_dynamic_frame(VRAM_SPRITE *d, uint8 *frame, sint32 width_minu
             count++;
         }
     }
-    LoadImage(&rect, (uint32 *)(frame + 4));
+    LoadImagePSX(&rect, (uint32 *)(frame + 4));
 }
 
 /* Original: SLES_004.74:FUN_8008D0C0 (0x8008D0C0..0x8008D0EC).
@@ -240,11 +239,11 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
         sy1 = (y + height_world - g_camera_world_y) * 0x163 / depth;
         if (sy0 > g_screen_height / 2 + 0x40 || sy1 < -0x40 - g_screen_height / 2)
             return;
-        /* D108 coordinates are relative to DrawEnv.ofs=(160,64). */
-        p->x0 = p->x2 = (sint16)(sx0 + 160);
-        p->x1 = p->x3 = (sint16)(sx1 + 160);
-        p->y0 = p->y1 = (sint16)(sy0 + 64);
-        p->y2 = p->y3 = (sint16)(sy1 + 64);
+        /* Coordinates are relative to DRAWENV.ofs=(160,64) */
+        p->x0 = p->x2 = (sint16)sx0;
+        p->x1 = p->x3 = (sint16)sx1;
+        p->y0 = p->y1 = (sint16)sy0;
+        p->y2 = p->y3 = (sint16)sy1;
     }
     else
     {
@@ -267,8 +266,8 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
             sint32 wy = cy + div_trunc_256(oy * cs + ox * sn);
             sint32 qx = (wx - g_camera_world_x) * 0x140 / depth;
             sint32 qy = (wy - g_camera_world_y) * 0x163 / depth;
-            *xp[i] = (sint16)(qx + 160);
-            *yp[i] = (sint16)(qy + 64);
+            *xp[i] = (sint16)qx;
+            *yp[i] = (sint16)qy;
             sumx += qx;
             sumy += qy;
             if (wx < minx)
@@ -372,7 +371,6 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
     VRAM_SPRITE *d = sprite_render_descriptor(resource);
     uint8 *frame;
     sint32 w, h, signed_w, left, top, width_world, height_world, depth, sx0, sx1, sy0, sy1;
-    (void)unused_10;
     if (!q)
     {
         memset(&local, 0, sizeof(local));
@@ -434,10 +432,10 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
         sy1 = (y + height_world - g_camera_world_y) * 0x163 / depth;
         if (sy0 > g_screen_height / 2 || sy1 < -(g_screen_height / 2))
             return;
-        q->x0 = q->x2 = (sint16)(sx0 + 160);
-        q->x1 = q->x3 = (sint16)(sx1 + 160);
-        q->y0 = q->y1 = (sint16)(sy0 + 64);
-        q->y2 = q->y3 = (sint16)(sy1 + 64);
+        q->x0 = q->x2 = (sint16)sx0;
+        q->x1 = q->x3 = (sint16)sx1;
+        q->y0 = q->y1 = (sint16)sy0;
+        q->y2 = q->y3 = (sint16)sy1;
     }
     else
     {
@@ -466,8 +464,8 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
             sint32 wx = (cx256 + div_trunc_256(ox * cs - oy * sn)) * 0x100;
             sint32 wy = (cy256 + div_trunc_256(oy * cs + ox * sn)) * 0x100;
             sint32 qx = (wx - g_camera_world_x) * 0x140 / depth, qy = (wy - g_camera_world_y) * 0x163 / depth;
-            *xp[i] = (sint16)(qx + 160);
-            *yp[i] = (sint16)(qy + 64);
+            *xp[i] = (sint16)qx;
+            *yp[i] = (sint16)qy;
             sumx += qx;
             sumy += qy;
         }
@@ -493,7 +491,6 @@ void sprite_resource_reset(void)
 /* Original: FUN_8008D0EC. */
 void sprite_descriptor_table_register(uint32 resource_id, sint32 unused, void *base)
 {
-    (void)unused;
     descriptor_bases[resource_id >> 10] = (VRAM_SPRITE *)base;
 }
 
@@ -545,7 +542,7 @@ void sprite_upload_pixels(void *raw_descriptor, uint8 *pixels, sint32 mode)
         }
         trace_count++;
     }
-    LoadImage(&rect, (uint32 *)pixels);
+    LoadImagePSX(&rect, (uint32 *)pixels);
     DrawSync(0);
 }
 
@@ -601,8 +598,6 @@ GDB_CALL uint32 sprite_clut_upload(uint32 resource_id, sint32 unused_2, sint32 u
     uint8 *frame = animation_frame_resource(resource_id), *source;
     PSX_RECT rect;
     sint32 i;
-    (void)unused_2;
-    (void)unused_3;
     if (!frame || count == 0 || count > 256)
         return 0;
     if (count * 2 == 0x20)
@@ -651,7 +646,7 @@ GDB_CALL uint32 sprite_clut_upload(uint32 resource_id, sint32 unused_2, sint32 u
         }
         clut_trace_count++;
     }
-    LoadImage(&rect, (uint32 *)converted);
+    LoadImagePSX(&rect, (uint32 *)converted);
     DrawSync(0);
     x = (uint16)g_clut_upload_x;
     g_clut_upload_x = (sint16)(g_clut_upload_x + count);

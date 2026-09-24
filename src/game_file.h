@@ -1,7 +1,8 @@
-#ifndef MODULE_API_PLATFORM_WIN_PLATFORM_FILE_H
-#define MODULE_API_PLATFORM_WIN_PLATFORM_FILE_H
+#ifndef MODULE_API_GAME_FILE_H
+#define MODULE_API_GAME_FILE_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 sint32 app_file_read(const char *path, void *destination, sint32 capacity, sint32 *size_out);

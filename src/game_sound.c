@@ -1,23 +1,17 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../effect_update.h"
-#include "../global.h"
-#include "../object.h"
-#include "../original_file.h"
-#include "../player.h"
-#include "../random.h"
-#include "../runtime_heap.h"
-#include "../stubs.h"
-#include "app.h"
-#include "audio/game_sound.h"
-#include "audio/psyq_sound.h"
-#include "audio/vab.h"
+#include "effect_update.h"
+#include "global.h"
+#include "object.h"
+#include "original_file.h"
+#include "player.h"
+#include "random.h"
+#include "runtime_heap.h"
+#include "stubs.h"
 #include "cc_archive.h"
 #include "collision.h"
-#include "player.h"
-#include "psyq_sound.h"
-#include "vab.h"
+#include "game_sound.h"
 
 /* Types. */
 typedef struct SOUND_MAP_ENTRY
@@ -56,7 +50,7 @@ static SOUND_MAP_ENTRY sound_map[294];
 
 static SOUND_VOLUME_PAIR spatial_volume;
 
-static SPU_voice_attributes voice_attr;
+static SpuVoiceAttr voice_attr;
 
 /* Functions. */
 __declspec(dllexport) volatile uint32 g_psx_spu_live_volume_calls;
@@ -102,7 +96,7 @@ void sound_bank_load(sint32 bank_index, sint32 first_sound)
         return;
     }
     program_count = (uint16)(header[18] | ((uint16)header[19] << 8));
-    bank = psyq_sound_vab_open_head(header, -1);
+    bank = SsVabOpenHead((uint8 *)header, -1);
     if (bank == -1)
     {
         fatal_error("VAB ERROR");
@@ -112,11 +106,6 @@ void sound_bank_load(sint32 bank_index, sint32 first_sound)
     strcat(body_path, bank_names[bank_index]);
     strcat(body_path, ".VB");
     body_size = game_file_size(body_path);
-    if (body_size != (sint32)vab_get_body_size(bank))
-    {
-        fatal_error("VAB BODY ERROR");
-        return;
-    }
     body = (uint8 *)malloc((uint32)body_size);
     if (!body)
     {
@@ -124,7 +113,7 @@ void sound_bank_load(sint32 bank_index, sint32 first_sound)
         return;
     }
     game_file_read(body_path, body);
-    if (psyq_sound_vab_transfer_body(body, bank) == -1 || !psyq_sound_vab_transfer_completed(1))
+    if (SsVabTransBody(body, bank) == -1 || !SsVabTransCompleted(SS_WAIT_COMPLETED))
         fatal_error("VAB TRANSFER");
     free(body);
     runtime_heap_sweep();
@@ -210,10 +199,10 @@ void stage_sound_banks_load(void)
         }
     }
     resolve_duplicate_sounds();
-    psyq_sound_set_tick_mode(1);
-    psyq_sound_start();
+    SsSetTickMode(SS_TICK60);
+    SsStart();
     runtime_heap_sweep();
-    psyq_sound_set_master_volume(127, 127);
+    SsSetMVol(127, 127);
 }
 
 /* Original: FUN_800AA64C. */
@@ -226,7 +215,7 @@ sint32 sound_play_nonpositional(sint32 id, sint32 note_delta, sint32 volume)
     if (scaled < 0)
         scaled += 127;
     scaled >>= 7;
-    return psyq_sound_key_on(sound_map[id].bank, sound_map[id].program, 0, (sint16)(note_delta + 60), 0, (sint16)scaled, (sint16)scaled);
+    return SsUtKeyOn(sound_map[id].bank, sound_map[id].program, 0, (sint16)(note_delta + 60), 0, (sint16)scaled, (sint16)scaled);
 }
 
 /* Original: FUN_800AA6F0. */
@@ -284,15 +273,14 @@ uint16 sound_play_positional(sint32 id, sint32 note_delta, sint32 type, sint32 x
     if (right < 0)
         right += 127;
     right >>= 7;
-    return (uint16)psyq_sound_key_on(sound_map[id].bank, sound_map[id].program, 0, (sint16)(note_delta + 60), 0, (sint16)left, (sint16)right);
+    return (uint16)SsUtKeyOn(sound_map[id].bank, sound_map[id].program, 0, (sint16)(note_delta + 60), 0, (sint16)left, (sint16)right);
 }
 
 /* Original: FUN_800AAA7C. */
-SPU_voice_attributes *sound_voice_spatial_volume_update(SOUND_VOLUME_PAIR *volume, sint32 handle)
+SpuVoiceAttr *sound_voice_spatial_volume_update(SOUND_VOLUME_PAIR *volume, sint32 handle)
 {
     sint32 left, right;
-    SPU_voice_registers registers;
-    if (handle < 0 || handle >= SPU_voice_count || !volume)
+    if (handle < 0 || handle >= 24 || !volume)
         return 0;
     ++g_psx_spu_live_volume_calls;
     left = volume->volume_left * g_sfx_playback_volume;
@@ -304,18 +292,12 @@ SPU_voice_attributes *sound_voice_spatial_volume_update(SOUND_VOLUME_PAIR *volum
         right += 127;
     right >>= 7;
     memset(&voice_attr, 0, sizeof(voice_attr));
-    voice_attr.voice_mask = 1u << handle;
-    voice_attr.attribute_mask = 3;
-    voice_attr.volume_left = (sint16)left;
-    voice_attr.volume_right = (sint16)right;
-    psyq_sound_set_voice_volume((sint16)handle, (sint16)left, (sint16)right);
-    if (psyq_sound_get_voice_registers((sint16)handle, &registers))
-    {
-        voice_attr.start_address = registers.start_address;
-        voice_attr.repeat_address = registers.repeat_address;
-        voice_attr.pitch = registers.pitch;
-        voice_attr.envelope = psyq_sound_get_voice_envelope((sint16)handle);
-    }
+    voice_attr.voice = SPU_KEYCH(handle);
+    voice_attr.mask = SPU_VOICE_VOLL | SPU_VOICE_VOLR;
+    voice_attr.volume.left = (sint16)left;
+    voice_attr.volume.right = (sint16)right;
+    sound_voice_attributes_apply(&voice_attr);
+    SpuGetVoiceAttr(&voice_attr);
     return &voice_attr;
 }
 
@@ -326,37 +308,33 @@ void sound_voice_stop(void *raw_handle)
     sint32 id = g_scuba_stage_active ? 163 : 11;
     if (!handle || *handle == -1 || sound_map[id].bank == 0xff)
         return;
-    if (psyq_sound_key_on_voice(*handle, sound_map[id].bank, sound_map[id].program, 0, 127, 0, 0, 0) != -1)
+    if (SsUtKeyOnV(*handle, sound_map[id].bank, sound_map[id].program, 0, 127, 0, 0, 0) != -1)
         *handle = -1;
 }
 
-/* 800AAB40 is the one-call game wrapper around SpuSetVoiceAttr.  The native
- * compatibility layer commits attributes synchronously at FUN_800AAA7C, so
- * there is no deferred hardware call left at this boundary. */
 /* Original: FUN_800AAB40. */
-void sound_voice_attributes_apply(SPU_voice_attributes *attr)
+void sound_voice_attributes_apply(SpuVoiceAttr *attr)
 {
-    sint16 voice;
-    if (!attr || attr->voice_mask == 0)
+    if (!attr || attr->voice == 0)
         return;
-    for (voice = 0; voice < SPU_voice_count; ++voice)
-        if (attr->voice_mask & (1u << voice))
-        {
-            if (attr->attribute_mask & 3u)
-                psyq_sound_set_voice_volume(voice, attr->volume_left, attr->volume_right);
-            if (attr->attribute_mask & 0x10u)
-            {
-                psyq_sound_set_voice_pitch(voice, attr->pitch);
-                ++g_psx_spu_pitch_update_calls;
-            }
-        }
+    SpuSetVoiceAttr(attr);
+    if (attr->mask & SPU_VOICE_PITCH)
+        ++g_psx_spu_pitch_update_calls;
 }
 
 /* Original: FUN_800AAB60. */
 sint32 sound_voice_status_get(sint8 voice)
 {
+    SpuVoiceAttr attributes;
     ++g_psx_spu_status_calls;
-    return psyq_sound_get_voice_status(voice);
+    if (voice < 0 || voice >= 24)
+        return -1;
+    if (!SpuGetKeyStatus(SPU_KEYCH(voice)))
+        return 0;
+    memset(&attributes, 0, sizeof(attributes));
+    attributes.voice = SPU_KEYCH(voice);
+    SpuGetVoiceAttr(&attributes);
+    return attributes.envx ? 1 : 3;
 }
 
 /* Original: FUN_800AADAC. */

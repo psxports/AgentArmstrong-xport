@@ -1,8 +1,9 @@
 #ifndef OA_V2_H
 #define OA_V2_H
 
-#include "app.h"
-#include "audio/game_sound.h"
+#include "xport.h"
+#include "psx.h"
+#include "game_sound.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "model.h"

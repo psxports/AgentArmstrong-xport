@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "cd.h"
 #include "code_module.h"
 #include "collision.h"
@@ -16,8 +15,8 @@
 #include "memory_card_platform.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/input.h"
+#include "game_runtime.h"
+#include "input.h"
 #include "player.h"
 #include "psx.h"
 #include "random.h"
@@ -1294,7 +1293,7 @@ void hq_level_update(void)
 #if 0 /* SKIP: original PSX memory-card availability warning is excluded. */
     if (g_memory_card_warning_checked == 0) hq_memory_card_warning_show();
 #endif
-    while (!app_quit_requested())
+    while (!xport_isquit())
     {
         hq_ambient_spawn_update();
         g_scene_brightness_bias = 0;

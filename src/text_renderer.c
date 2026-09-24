@@ -1,7 +1,6 @@
 #include <string.h>
-#include "app.h"
 #include "global.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "player.h"
 #include "psx.h"
 #include "resource_table.h"

@@ -1,7 +1,8 @@
 #ifndef TANK_H
 #define TANK_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "model.h"

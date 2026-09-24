@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include "airship.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "collision.h"
 #include "effect_update.h"
@@ -49,6 +48,7 @@ struct DESTRUCTIBLE_HIERARCHY
     uint8 field_07c[0x5c4];  /* +0x07C */
     EFFECT *owner_effect;    /* +0x640 */
     uint8 field_644[0x24];   /* +0x644 */
+
     union
     {
         MAP_MODEL_GROUP *group;

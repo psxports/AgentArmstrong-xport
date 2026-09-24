@@ -1,6 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
+#include "global.h"
 #include "object.h"
 #include "sprite.h"
 #include "stubs.h"

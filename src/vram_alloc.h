@@ -1,7 +1,8 @@
 #ifndef MODULE_API_VRAM_ALLOC_H
 #define MODULE_API_VRAM_ALLOC_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "sprite.h"
 
 typedef struct VramRegion

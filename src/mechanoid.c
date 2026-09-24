@@ -2,8 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "code_module.h"
 #include "collision.h"
@@ -15,7 +14,7 @@
 #include "object.h"
 #include "original_file.h"
 #include "original_tables.h"
-#include "platform/win/platform_file.h"
+#include "game_file.h"
 #include "player.h"
 #include "projectile.h"
 #include "random.h"
@@ -127,8 +126,6 @@ static void mechanoid_damage(MECHANOID_ACTOR *boss, void *source)
 /* Original: BIGROB_800FBD6C. */
 static void mechanoid_damage_player_on_contact(MECHANOID_ACTOR *boss, void *source)
 {
-    (void)boss;
-    (void)source;
     player_apply_damage(0, g_player);
 }
 

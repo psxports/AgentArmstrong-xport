@@ -1,4 +1,3 @@
-#include "app.h"
 #include "collision.h"
 #include "global.h"
 

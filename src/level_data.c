@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "cc_archive.h"
 #include "effect_update.h"
 #include "global.h"
@@ -11,7 +10,7 @@
 #include "model.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "player.h"
 #include "psx.h"
 #include "runtime_heap.h"

@@ -2,8 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "global.h"
+#include "game_sound.h"
 #include "collision.h"
 #include "mission.h"
 #include "object.h"

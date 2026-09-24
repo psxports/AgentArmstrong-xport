@@ -1,4 +1,4 @@
-#include "app.h"
+#include "global.h"
 
 /* Variables. */
 /* Original: SLES_004.74:DAT_800D4188; primary RNG word (gp+0x500). */

@@ -1,12 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "global.h"
 #include "map.h"
 #include "model.h"
 #include "object.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "player.h"
 #include "psx.h"
 #include "render.h"
@@ -15,10 +14,6 @@
 /* Types. */
 /* Direct HQ translation of FUN_80092D50 and the fixed-bucket model renderer
  * FUN_800914D8.  FUN_800924EC is a separate hierarchical-object path. */
-
-typedef sint16 sint16;
-
-typedef uint16 u16;
 
 typedef struct PackedVertex
 {
@@ -33,12 +28,33 @@ typedef struct PackedPolygon
 typedef struct Model
 {
     const uint8 *record;
-    u16 vertex_count;
+    uint16 vertex_count;
     const PackedVertex *vertices;
-    u16 polygon_count;
+    uint16 polygon_count;
     PackedPolygon *polygons;
     sint32 descriptor_half_x, descriptor_half_y, descriptor_half_z;
 } Model;
+
+static sint32 mac_shift12(sint64 value)
+{
+    if (value >= 0)
+        return (sint32)(value >> 12);
+    return -(sint32)(((-value) + 0xfff) >> 12);
+}
+
+MATRIX *MulMatrix0(MATRIX *m0, MATRIX *m1, MATRIX *m2)
+{
+    MATRIX out;
+    sint32 row, column;
+    if (!m0 || !m1 || !m2)
+        return m2;
+    memset(&out, 0, sizeof(out));
+    for (row = 0; row < 3; row++)
+        for (column = 0; column < 3; column++)
+            out.m[row][column] = (sint16)mac_shift12((sint64)m0->m[row][0] * m1->m[0][column] + (sint64)m0->m[row][1] * m1->m[1][column] + (sint64)m0->m[row][2] * m1->m[2][column]);
+    *m2 = out;
+    return m2;
+}
 
 typedef struct ModelPacketTemplate
 {
@@ -441,8 +457,8 @@ static void project_model_vertex(sint32 base_x, sint32 base_y, sint32 base_z, si
        clamped. The unclamped transformed Z remains in the OT-depth array. */
     if (depth < 1)
         depth = 8;
-    *sx = 160 + (base_x + rx) * 0x140 / depth;
-    *sy = 64 + (base_y + ry) * 0x163 / depth;
+    *sx = (base_x + rx) * 0x140 / depth;
+    *sy = (base_y + ry) * 0x163 / depth;
 }
 
 static void draw_model(sint32 id, sint32 wx, sint32 wy, sint32 wz, sint32 depth_reference_z, sint32 rot_y, sint32 rot_x, sint32 rot_z, sint32 row_bucket, sint32 shade)
@@ -1070,7 +1086,7 @@ void model_render_node(MODEL_NODE *node, MATRIX *parent)
     if (node->scale != 0)
     {
         scaled.vx = scaled.vy = scaled.vz = node->scale;
-        ScaleMatrixL(&world, &scaled);
+        ScaleMatrix(&world, &scaled);
     }
     node->world_x = world.t[0] + g_camera_world_x;
     node->world_y = world.t[1] + g_camera_world_y;

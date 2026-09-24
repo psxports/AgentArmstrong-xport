@@ -3,12 +3,14 @@
 
 #include <stddef.h>
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* Types. */
 typedef union
 {
     uint32 packed;
+
     struct
     {
         uint16 flags;
@@ -19,6 +21,7 @@ typedef union
 typedef union
 {
     uint32 packed;
+
     struct
     {
         sint16 light_bias;

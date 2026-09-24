@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "global.h"
 #include "object.h"
-#include "platform/win/platform_file.h"
+#include "game_file.h"
 #include "stubs.h"
 
 /* Types. */

@@ -1,7 +1,8 @@
 #ifndef ORIGINAL_TABLES_H
 #define ORIGINAL_TABLES_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 const sint32 *original_tables_mips_sine_table(void);

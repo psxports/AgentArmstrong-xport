@@ -1,7 +1,8 @@
 #ifndef MODULE_API_ORIGINAL_FILE_H
 #define MODULE_API_ORIGINAL_FILE_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 GDB_CALL sint32 game_file_size(const char *path);

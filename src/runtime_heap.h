@@ -1,7 +1,8 @@
 #ifndef MODULE_API_RUNTIME_HEAP_H
 #define MODULE_API_RUNTIME_HEAP_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "sprite.h"
 
 /* BEGIN GENERATED MODULE API */

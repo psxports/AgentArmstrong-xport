@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include "airship.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "collision.h"
 #include "global.h"
 #include "gyro.h"

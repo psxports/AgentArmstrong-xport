@@ -1,8 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "code_module.h"
 #include "collision.h"
 #include "effect_update.h"
@@ -174,7 +173,7 @@ void bio_goo_create(EFFECT *e)
     collision_box_set(o, 0xc0, 0x80, 0xc0);
     o->health = 100;
     o->collision.box_y /= 2;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 31 && getenv("OA_STAGE31_TRACE"))
     {
         uint8 before = g_objective_counts[15];
@@ -295,7 +294,7 @@ void robot_press_create(EFFECT *e)
     collision_box_set(o, 0x40, 0x80, 0x40);
     o->health = 150;
     o->collision.box_y /= 2;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 32 && getenv("OA_STAGE32_TRACE"))
     {
         COLLISION *near = (COLLISION *)object_find_next_by_type(0, 0x92);
@@ -396,7 +395,7 @@ void industry_gun_controller_create(EFFECT *effect)
     INDUSTRY_GUN_CONTROLLER *controller = (INDUSTRY_GUN_CONTROLLER *)object_create(sizeof(*controller), (FUNC_COLLISION_UPDATE)industry_gun_controller_update);
     controller->source_effect = effect;
     effect->type = 0;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 27 && getenv("OA_STAGE27_TRACE"))
     {
         sint32 ox = g_camera_world_x, oy = g_camera_world_y, oz = g_camera_world_z, ow = g_screen_half_width;

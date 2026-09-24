@@ -1,4 +1,3 @@
-#include "app.h"
 #include "camera.h"
 #include "global.h"
 #include "object.h"
@@ -24,7 +23,6 @@ void camera_update(sint32 player_x, sint32 player_y, sint32 player_z, sint32 mod
     uint32 horizontal = mode == 2 ? 1u : mode == 6 ? ~0u : 0u;
     uint32 player_camera_flags = g_player->sampled_buttons;
     sint32 diagonal_target = ((uint32)(mode - 3) < 2 || mode == 5) ? 0x40 : 0;
-    (void)unchanged_direction_frames;
     if (g_hq_world_map_active != 0)
         return;
     if (g_camera_depth_offset < diagonal_target + g_camera_depth_offset_target)

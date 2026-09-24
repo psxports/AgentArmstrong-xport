@@ -1,7 +1,8 @@
 #ifndef AP_MINI_GYRO_H
 #define AP_MINI_GYRO_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "map.h"

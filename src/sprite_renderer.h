@@ -1,7 +1,8 @@
 #ifndef SPRITE_RENDERER_H
 #define SPRITE_RENDERER_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "sprite.h"
 
 #if defined(AP_32BIT)

@@ -1,9 +1,8 @@
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "global.h"
 #include "object.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "sprite.h"
 #include "stubs.h"
 #include "vram_alloc.h"

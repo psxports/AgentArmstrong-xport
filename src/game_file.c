@@ -1,8 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "../../object.h"
-#include "app.h"
+#include "object.h"
+#include "global.h"
 
 /* Functions. */
 static void normalize_path(const char *source, char *destination, sint32 size)
@@ -38,7 +38,7 @@ static FILE *open_data_file(const char *path, const char *mode)
     /* All original CD paths are relative to the disc's DATA directory in the
        Windows distribution.  Accept an already-prefixed path without adding
        DATA twice, but keep game code using the original PSX names. */
-    if (_strnicmp(relative, "DATA/", 5) == 0)
+    if ((relative[0] == 'D' || relative[0] == 'd') && (relative[1] == 'A' || relative[1] == 'a') && (relative[2] == 'T' || relative[2] == 't') && (relative[3] == 'A' || relative[3] == 'a') && relative[4] == '/')
         relative += 5;
     if (configured_root != NULL && strlen(configured_root) + strlen(relative) + 7 < sizeof(candidate))
     {

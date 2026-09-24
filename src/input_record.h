@@ -1,7 +1,8 @@
 #ifndef MODULE_API_INPUT_RECORD_H
 #define MODULE_API_INPUT_RECORD_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 sint32 input_playback_next(void);

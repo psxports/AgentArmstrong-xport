@@ -1,7 +1,8 @@
 #ifndef MODULE_API_CAMERA_H
 #define MODULE_API_CAMERA_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "effect_update.h"
 
 /* BEGIN GENERATED MODULE API */

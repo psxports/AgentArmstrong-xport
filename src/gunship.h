@@ -1,7 +1,8 @@
 #ifndef OPEN_ARMSTRONG_GUNSHIP_H
 #define OPEN_ARMSTRONG_GUNSHIP_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "model.h"

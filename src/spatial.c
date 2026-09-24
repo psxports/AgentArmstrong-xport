@@ -1,5 +1,4 @@
 #include <stddef.h>
-#include "app.h"
 #include "global.h"
 #include "stubs.h"
 

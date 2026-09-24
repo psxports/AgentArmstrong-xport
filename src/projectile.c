@@ -1,8 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "collision.h"
 #include "global.h"

@@ -56,23 +56,24 @@
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
-    <IntDir>$(ProjectDir)..\..\..\_build\x86\Debug\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\_build\AA\x86\Debug\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
-    <IntDir>$(ProjectDir)..\..\..\_build\x86\Release\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\_build\AA\x86\Release\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
-    <IntDir>$(ProjectDir)..\..\..\_build\x64\Debug\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\_build\AA\x64\Debug\</IntDir>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IntDir>$(ProjectDir)..\..\..\_build\x64\Release\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\_build\AA\x64\Release\</IntDir>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>AP_WIN;_CRT_SECURE_NO_WARNINGS;_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>XPORT_NATIVE;_CRT_SECURE_NO_WARNINGS;_DEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -81,7 +82,10 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
+      <!-- Native 24-bit OT links require one 16-MiB image segment -->
+      <BaseAddress>0x02000000</BaseAddress>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <ProgramDatabaseFile>$(IntDir)AA.pdb</ProgramDatabaseFile>
       <ImportLibrary>$(IntDir)AA.lib</ImportLibrary>
@@ -91,9 +95,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>AP_WIN;_CRT_SECURE_NO_WARNINGS;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>XPORT_NATIVE;_CRT_SECURE_NO_WARNINGS;NDEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -104,7 +109,10 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
     </ClCompile>
     <Link>
-      <SubSystem>Console</SubSystem>
+      <SubSystem>Windows</SubSystem>
+      <!-- Native 24-bit OT links require one 16-MiB image segment -->
+      <BaseAddress>0x02000000</BaseAddress>
+      <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <!-- Original address-named callbacks remain distinct even when their
            instruction bodies are identical; callback tables observe identity. -->
       <EnableCOMDATFolding>false</EnableCOMDATFolding>
@@ -117,12 +125,24 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\audio\spu_core.c" />
-    <ClCompile Include="..\..\audio\vab.c" />
-    <ClCompile Include="..\..\audio\audio_runtime.c" />
-    <ClCompile Include="..\..\audio\ima_adpcm.c" />
-    <ClCompile Include="..\..\audio\psyq_sound.c" />
-    <ClCompile Include="..\..\audio\game_sound.c" />
+    <ClCompile Include="..\..\..\..\xport\src\platform\win\main.c">
+      <ObjectFileName>$(IntDir)xport_main.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\xport\src\psx.c">
+      <ObjectFileName>$(IntDir)xport_psx.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\xport\src\psx_gpu.c">
+      <ObjectFileName>$(IntDir)xport_psx_gpu.obj</ObjectFileName>
+      <Optimization Condition="'$(Configuration)'=='Debug'">MaxSpeed</Optimization>
+      <BasicRuntimeChecks Condition="'$(Configuration)'=='Debug'">Default</BasicRuntimeChecks>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\xport\src\psx_pad.c">
+      <ObjectFileName>$(IntDir)xport_psx_pad.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\xport\src\psx_spu.c">
+      <ObjectFileName>$(IntDir)xport_psx_spu.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\game_sound.c" />
     <ClCompile Include="..\..\animation.c" />
     <ClCompile Include="..\..\industry.c" />
     <ClCompile Include="..\..\radar_death.c" />
@@ -150,14 +170,11 @@
     <ClCompile Include="..\..\memory_card_platform.c" />
     <ClCompile Include="..\..\input_record.c" />
     <ClCompile Include="..\..\level_data.c" />
-    <ClCompile Include="..\..\main.c" />
+    <ClCompile Include="..\..\game.c" />
     <ClCompile Include="..\..\mechanoid.c" />
     <ClCompile Include="..\..\model.c" />
     <ClCompile Include="..\..\original_file.c" />
     <ClCompile Include="..\..\original_tables.c" />
-    <ClCompile Include="..\..\psx.c">
-      <ObjectFileName>$(IntDir)psx_core.obj</ObjectFileName>
-    </ClCompile>
     <ClCompile Include="..\..\random.c" />
     <ClCompile Include="..\..\resource_table.c" />
     <ClCompile Include="..\..\scuba_player.c" />
@@ -169,24 +186,29 @@
     <ClCompile Include="..\..\gyro.c" />
     <ClCompile Include="..\..\gunship.c" />
     <ClCompile Include="..\..\vram_alloc.c" />
-    <ClCompile Include="input.c" />
-    <ClCompile Include="audio_waveout.c" />
-    <ClCompile Include="platform_file.c" />
-    <ClCompile Include="game_platform.c" />
+    <ClCompile Include="..\..\input.c" />
+    <ClCompile Include="..\..\game_file.c" />
+    <ClCompile Include="..\..\game_runtime.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\animation.h" />
     <ClInclude Include="..\..\airship.h" />
-    <ClInclude Include="..\..\app.h" />
     <ClInclude Include="..\..\cc_archive.h" />
     <ClInclude Include="..\..\cd.h" />
     <ClInclude Include="..\..\code_module.h" />
     <ClInclude Include="..\..\model.h" />
     <ClInclude Include="..\..\mechanoid.h" />
     <ClInclude Include="..\..\original_tables.h" />
-    <ClInclude Include="..\..\psx.h" />
+    <ClInclude Include="..\..\..\..\xport\src\xport.h" />
+    <ClInclude Include="..\..\..\..\xport\src\psx.h" />
+    <ClInclude Include="..\..\..\..\xport\src\psx_gpu.h" />
+    <ClInclude Include="..\..\..\..\xport\src\psx_pad.h" />
+    <ClInclude Include="..\..\..\..\xport\src\psx_spu.h" />
     <ClInclude Include="..\..\scuba_player.h" />
-    <ClInclude Include="game_platform.h" />
+    <ClInclude Include="..\..\game_runtime.h" />
+    <ClInclude Include="..\..\game_file.h" />
+    <ClInclude Include="..\..\game_sound.h" />
+    <ClInclude Include="..\..\input.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />

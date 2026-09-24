@@ -1,15 +1,14 @@
 #include <stdio.h>
 #include <string.h>
-#include "app.h"
-#include "audio/game_sound.h"
-#include "audio/psyq_sound.h"
+#include "psx_gpu.h"
+#include "game_sound.h"
 #include "global.h"
 #include "memory_card_platform.h"
 #include "mission.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/input.h"
+#include "game_runtime.h"
+#include "input.h"
 #include "player.h"
 #include "psx.h"
 #include "render.h"
@@ -86,13 +85,13 @@ void sound_all_voices_stop(void)
 /* Original: FUN_800B30F4. */
 GDB_CALL void gpu_draw_sync(sint32 mode)
 {
-    (void)mode;
 }
 
 /* Original: FUN_800B3768. */
 GDB_CALL void drawenv_apply(void *env)
 {
-    (void)env;
+    DRAWENV *draw_environment = (DRAWENV *)env;
+    gpu_draw_env((uint32)(intptr)draw_environment, draw_environment->clip.x, draw_environment->clip.y);
 }
 
 /* Native GPU submission boundary. Original 800FDDD4 submits before the
@@ -104,38 +103,17 @@ GDB_CALL void ot_submit(uint32 *ot)
     psx_end_frame();
 }
 
-/* Original: FUN_800B8750. */
-static void cd_sync(sint32 command, void *state)
-{
-    (void)command;
-    (void)state;
-}
-
-/* Original: FUN_800B8A24. */
-static void cd_control(sint32 command, sint32 left, sint32 right)
-{
-    (void)command;
-    (void)left;
-    (void)right;
-}
-
 /* Exact call sequences at 0x800A9F60 and 0x800A9FB0. */
 /* Original: FUN_800A9F60. */
 void cd_audio_pause(void)
 {
-    cd_sync(0, &g_cd_sync_state);
-    cd_control(9, 0, 0);
-    cd_sync(0, &g_cd_sync_state);
-    psyq_sound_music_pause();
+    CdControl(CdlPause, 0, 0);
 }
 
 /* Original: FUN_800A9FB0. */
 void cd_audio_play(void)
 {
-    cd_sync(0, &g_cd_sync_state);
-    cd_control(3, 0, 0);
-    cd_sync(0, &g_cd_sync_state);
-    psyq_sound_music_resume();
+    CdControl(CdlPlay, 0, 0);
 }
 
 static const char *executable_text(uint32 address)
@@ -153,6 +131,7 @@ static void screenshot_capture(void)
     {
         SCREENSHOT_WORK_CAPACITY = 397312
     };
+
     static uint8 work[SCREENSHOT_WORK_CAPACITY];
     const char *restore_path = g_scuba_stage_active == 0 ? "COMMON0\\OVERBINS.BIN" : "WATER\\BIGDIVER.BIN";
     PSX_RECT rect;

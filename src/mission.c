@@ -4,8 +4,7 @@
 #include <string.h>
 #include "airship.h"
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "global.h"
@@ -15,7 +14,7 @@
 #include "mission.h"
 #include "model.h"
 #include "object.h"
-#include "platform/win/game_platform.h"
+#include "game_runtime.h"
 #include "player.h"
 #include "projectile.h"
 #include "psx.h"
@@ -236,7 +235,7 @@ void mission_unlock_text_show(sint32 stage)
         offset = hq_scrolling_text_render(text, offset, extent, caption, 0);
         screen_overlay_draw();
         end_frame_submit(0);
-        if ((g_pressed_buttons & 0x10) != 0 || psx_quit_requested())
+        if ((g_pressed_buttons & 0x10) != 0 || xport_isquit())
             break;
     }
     g_player->menu_resume = 1;
@@ -764,7 +763,7 @@ void tower_surface_trigger_update(EFFECT *effect)
     if (g_player_world_y < effect->y + 0x1f00 - ((sint16)effect->values[0] << 8) || effect->y + 0x2300 < g_player_world_y)
         return;
     g_player->surface_state = 1;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 28 && getenv("OA_STAGE28_TRACE"))
     {
         FILE *f = fopen("../status/the-tower-native.log", "w");
@@ -816,7 +815,7 @@ void falling_hazard_create(EFFECT *effect)
     object->damage = 0xaa;
     collision_box_set(object, 0x60, 0x60, 0x60);
     object->collision.box_y += 0x3000;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 26 && getenv("OA_STAGE26_TRACE"))
     {
         sint32 player_x = g_player_world_x;
@@ -1480,7 +1479,7 @@ void airfield_enemy_fire(MISSION_ENEMY_ACTOR *object)
     projectile->floor_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_trail_update;
     projectile->impact_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_impact;
     projectile->collision.object_type = 0;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
@@ -1546,7 +1545,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
     sint32 route_index_bias;
     MISSION_ENEMY_ACTOR *object;
 
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (source_type == 0x49 && g_stage_index == 17 && source == g_effects + 9)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
@@ -1746,7 +1745,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
         object->collision.x = waypoint->x;
         object->collision.z = waypoint->z;
     }
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (object_type == 0x49 && g_stage_index == 17 && source == g_effects + 9)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
@@ -1857,9 +1856,6 @@ static void air_raid_sequence_update(AIR_RAID_SEQUENCE *object)
 void air_raid_sequence_create(sint32 x, sint32 y, sint32 z, BUILDING *building)
 {
     AIR_RAID_SEQUENCE *object;
-    (void)x;
-    (void)y;
-    (void)z;
     object = (AIR_RAID_SEQUENCE *)object_create(sizeof(*object), (FUNC_COLLISION_UPDATE)air_raid_sequence_update);
     object->first_sound_handle = (sint16)sound_play_nonpositional(0x32, -1, 0x7f);
     object->building = building;
@@ -2191,7 +2187,6 @@ void hud_bar_render(MISSION_HUD_BAR *hud, sint32 amount, sint32 unused, sint32 z
     sint32 maximum = hud->maximum;
     sint32 width = hud->width;
     sint32 visible_width = zero_width;
-    (void)unused;
     if (maximum < amount)
         amount = maximum;
     if (amount != 0)

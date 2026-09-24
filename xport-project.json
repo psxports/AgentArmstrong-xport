@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "name": "AgentArmstrong",
+  "toolset": "../xport/tools",
+  "paths": {
+    "status": "status",
+    "project_tools": "tools",
+    "analysis_database": "status/analysis.sqlite",
+    "native_executable": "bin/AA.exe",
+    "native_working_directory": "bin",
+    "native_solution": "src/platform/win/AA.sln",
+    "native_build": "_build",
+    "callgraph": "status/callgraph.json",
+    "similarity_directory": "status/similarity",
+    "disc_image": "orig/SLES_004.74",
+    "original_executable": "orig/SLES_004.74",
+    "ida_exports": "status/ida/images",
+    "ida_configs": "tools/ida",
+    "sdk_classification": "status/ghidra/classification.json",
+    "semantic_map": "status/semantic-map.json"
+  },
+  "duckstation": {
+    "host": "127.0.0.1",
+    "gdb_port": 2407,
+    "reserved_gdb_ports": {
+      "audit": 2404,
+      "trace": 2405,
+      "user": 2406,
+      "migration": 2407
+    },
+    "default_role": "migration",
+    "data_directory": "tools/duckstation/migration-runtime",
+    "data_directories": {
+      "audit": "tools/duckstation/api-runtime",
+      "trace": "tools/duckstation/trace-runtime",
+      "user": "tools/duckstation/user-runtime",
+      "migration": "tools/duckstation/migration-runtime"
+    }
+  },
+  "analysis": {
+    "default_image": "SLES_004.74",
+    "images": [
+      "SLES_004.74"
+    ]
+  },
+  "capabilities": {
+    "trace_workflow": {
+      "enabled": false,
+      "reason": "Agent Armstrong trace hooks, capture layout, native continuation ABI and stage adapter are not yet evidence-backed"
+    }
+  },
+  "code_refresh": {
+    "report": "status/code-refresh-latest.json",
+    "log": "status/code-refresh-latest.log",
+    "build": {
+      "solution": "src/platform/win/AA.sln",
+      "configuration": "Debug",
+      "platform": "x86",
+      "process_name": "AA.exe"
+    },
+    "tests": [],
+    "artifacts": []
+  },
+  "pipeline_state": {
+    "trace_profile": "blocked_pending_game_layout_audit",
+    "stage_adapter": "blocked_pending_continuation_abi"
+  }
+}

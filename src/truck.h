@@ -1,7 +1,8 @@
 #ifndef TRUCK_H
 #define TRUCK_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "mission.h"

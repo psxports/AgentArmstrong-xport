@@ -1,7 +1,8 @@
 #ifndef MODULE_API_RESOURCE_TABLE_H
 #define MODULE_API_RESOURCE_TABLE_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 uint8 *resource_table_data(uint32 resource_id);

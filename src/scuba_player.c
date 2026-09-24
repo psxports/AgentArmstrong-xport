@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include "airship.h"
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "code_module.h"
 #include "collision.h"
@@ -223,8 +222,9 @@ typedef char ScubaPlayer_node_table_at_678[offsetof(SCUBA_PLAYER, node_table) ==
 #endif
 
 /* Macros. */
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
 static uint32 scuba_trace_seen;
+
 static void scuba_trace(uint32 bit, const char *tag, void *raw)
 {
     FILE *file;
@@ -379,7 +379,7 @@ static void scuba_ship_target_damage(SCUBA_SHIP_TARGET *object, FLASHABLE *hit)
 /* Original: SCUBA_800FED94. */
 static void scuba_ship_target_update(SCUBA_SHIP_TARGET *object)
 {
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     {
         static sint32 seen;
         if (!seen && getenv("OA_STAGE20_TRACE"))
@@ -428,7 +428,7 @@ void scuba_ship_target_create(EFFECT *effect)
     object->collision.box_y /= 2;
     effect->type = 0;
     object->owner_effect = effect;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (getenv("OA_STAGE20_TRACE"))
     {
         static sint32 count;
@@ -449,7 +449,7 @@ void scuba_ship_target_create(EFFECT *effect)
 static void scuba_tug_target_update(SCUBA_TUG_TARGET *o)
 {
     MODEL_NODE *node = &o->nodes[0];
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     {
         static sint32 seen;
         if (!seen && getenv("OA_TUG_TRACE"))
@@ -560,7 +560,7 @@ void scuba_tug_target_create(EFFECT *effect)
     object->nodes[0].rotation_x = 0;
     object->nodes[0].rotation_z = 0;
     object->nodes[0].rotation_y = (sint16)(random_range(0x200) + 0x300);
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (getenv("OA_TUG_TRACE"))
     {
         static sint32 count;
@@ -1097,7 +1097,6 @@ void scuba_bubble_emitter_update(EFFECT *effect)
 void scuba_noop_effect_update(EFFECT *effect)
 {
     scuba_trace(0x800, "UPDATE6F", effect);
-    (void)effect;
 }
 
 /* 0x800FC528: periodic distant water particle. */
@@ -1220,16 +1219,16 @@ static void scuba_player_update(SCUBA_PLAYER *player)
         player->desired_velocity.x = player->direction_x * 0x200;
     if ((input & 0x5000) != 0)
         player->desired_velocity.z = player->direction_z * 0x200;
-#define APPROACH_COMPONENT(component)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
-    do                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 \
-    {                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
-        actual = player->velocity.component;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
-        desired = player->desired_velocity.component;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  \
-        if (actual < desired)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          \
-            actual += 0x20;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
-        if (desired < actual)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          \
-            actual -= 0x20;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            \
-        player->velocity.component = actual;                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           \
+#define APPROACH_COMPONENT(component) \
+    do \
+    { \
+        actual = player->velocity.component; \
+        desired = player->desired_velocity.component; \
+        if (actual < desired) \
+            actual += 0x20; \
+        if (desired < actual) \
+            actual -= 0x20; \
+        player->velocity.component = actual; \
     } while (0)
     APPROACH_COMPONENT(x);
     APPROACH_COMPONENT(y);
@@ -1511,7 +1510,7 @@ static void scuba_mine_update(SCUBA_MINE *object)
 {
     sint32 dx, dy, dz, flash = 0;
     scuba_trace(0x20, "UPDATE69", (uint8 *)object - 4);
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     {
         static sint32 seen;
         if (!seen && getenv("OA_STAGE19_TRACE"))

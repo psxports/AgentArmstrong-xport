@@ -1,7 +1,7 @@
 #ifndef CD_H
 #define CD_H
 
-#include "app.h"
+#include "global.h"
 
 extern __declspec(dllexport) uint32 g_psx_cd_event_class;
 extern __declspec(dllexport) uint32 g_psx_cd_event_spec;

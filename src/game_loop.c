@@ -1,4 +1,4 @@
-#include "app.h"
+#include "psx_gpu.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "global.h"
@@ -9,8 +9,8 @@
 #include "mission.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/input.h"
+#include "game_runtime.h"
+#include "input.h"
 #include "player.h"
 #include "random.h"
 #include "render.h"
@@ -123,6 +123,7 @@ GDB_CALL DISPENV *display_env_initialize(DISPENV *env, sint32 x, sint32 y, sint3
 GDB_CALL DISPENV *display_env_apply(DISPENV *env)
 {
     g_psx_current_display_env = env;
+    gpu_set_display(env->disp.x, env->disp.y, env->disp.w, env->disp.h);
     return env;
 }
 
@@ -141,7 +142,7 @@ GDB_CALL void startup_warning_show(void)
     display_env_apply(env);
     vertical_sync_wait(0);
     display_mask_set(1);
-#ifndef AP_WIN
+#ifndef XPORT_NATIVE
     g_shared_scratch_value = 200;
     do
     {
@@ -163,7 +164,7 @@ GDB_CALL void startup_warning_show(void)
 /* Original: FUN_8008B06C. */
 void mission_game_loop(void)
 {
-    while (!app_quit_requested())
+    while (!xport_isquit())
     {
         void *menu = (void *)player_assets_executable_address(g_level_select_cheat_enabled ? 0x800c7f04u : 0x800c7e94u);
         sint32 menu_result;

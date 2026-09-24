@@ -1,8 +1,8 @@
 #include <string.h>
-#include "app.h"
+#include "global.h"
 #include "cc_archive.h"
 #include "original_file.h"
-#include "platform/win/platform_file.h"
+#include "game_file.h"
 
 /* Variables. */
 static uint8 *archive_data;

@@ -1,5 +1,5 @@
 #include <stddef.h>
-#include "app.h"
+#include "global.h"
 #include "resource_table.h"
 
 /* Variables. */

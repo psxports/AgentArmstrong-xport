@@ -1,14 +1,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
-#include "audio/psyq_sound.h"
 #include "game_loop.h"
 #include "global.h"
 #include "memory_card_platform.h"
 #include "object.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/input.h"
+#include "game_runtime.h"
+#include "input.h"
 #include "player.h"
 #include "render.h"
 #include "text_renderer.h"
@@ -23,69 +21,7 @@
 #undef itoa
 
 /* Functions. */
-__declspec(dllexport) volatile uint32 g_psx_draw_sync_count;
-
-__declspec(dllexport) volatile sint32 g_psx_draw_sync_last_mode;
-
-__declspec(dllexport) volatile uint32 g_psx_ss_set_tick_mode_calls, g_psx_ss_start_calls, g_psx_ss_set_mvol_calls;
-
 __declspec(dllexport) volatile uint32 g_psx_spu_shutdown_core_calls;
-
-GDB_CALL sint32 game_psx_draw_sync(void *user, sint32 mode)
-{
-    (void)user;
-    g_psx_draw_sync_last_mode = mode;
-    ++g_psx_draw_sync_count;
-    return 0;
-}
-
-void game_psx_sound_initialize(void *user)
-{
-    (void)user;
-    psyq_sound_init();
-}
-
-void game_psx_sound_shutdown(void *user)
-{
-    (void)user;
-    psyq_sound_end();
-}
-
-GDB_CALL void game_psx_sound_set_tick_mode(void *user, sint32 mode)
-{
-    (void)user;
-    psyq_sound_set_tick_mode(mode);
-    ++g_psx_ss_set_tick_mode_calls;
-}
-
-GDB_CALL void game_psx_sound_start(void *user)
-{
-    (void)user;
-    psyq_sound_start();
-    ++g_psx_ss_start_calls;
-}
-
-GDB_CALL void game_psx_sound_set_master_volume(void *user, sint16 left, sint16 right)
-{
-    (void)user;
-    psyq_sound_set_master_volume(left, right);
-    ++g_psx_ss_set_mvol_calls;
-}
-
-void game_psx_sound_set_serial_attributes(void *user, sint8 serial, sint8 attribute, sint8 value)
-{
-    (void)user;
-    (void)serial;
-    (void)attribute;
-    (void)value;
-}
-
-void game_psx_sound_set_serial_volume(void *user, sint8 serial, sint16 left, sint16 right)
-{
-    (void)user;
-    (void)serial;
-    psyq_sound_music_set_volume(((sint32)left + right) / 2);
-}
 
 /* Original: FUN_8008BE50. */
 GDB_CALL const char *loading_image_next_path(void)
@@ -142,11 +78,13 @@ GDB_CALL void fatal_error(const char *message)
 GDB_CALL void music_track_select(sint32 id, sint32 unused)
 {
     const uint8 *volume_table = (const uint8 *)player_assets_executable_address(0x800cbaf0u);
+    sint32 track;
     sint32 volume;
-    (void)unused;
     g_current_music_track = id;
     volume = ((sint32)volume_table[id] * g_music_volume_setting) / 0x80;
-    psx_select_music_track(id + g_cd_audio_track_offset, volume);
+    track = id + g_cd_audio_track_offset;
+    SsSetSerialVol(SS_SERIAL_A, (sint16)volume, (sint16)volume);
+    CdPlay(1, &track, 0);
 }
 
 /* 0x800B2058..0x800B2064. */
@@ -158,16 +96,16 @@ GDB_CALL sint32 video_mode_set(sint32 value)
     return previous;
 }
 
-static void psx_spu_shutdown_core(void)
+static void sound_shutdown_core(void)
 {
-    psyq_sound_quit();
+    SsQuit();
     ++g_psx_spu_shutdown_core_calls;
 }
 
 /* Original: FUN_800BB5F8. */
-GDB_CALL void spu_shutdown(void)
+GDB_CALL void sound_system_shutdown(void)
 {
-    psx_spu_shutdown_core();
+    sound_shutdown_core();
 }
 
 /* Native formatting adapter; no independent original MIPS entry. */

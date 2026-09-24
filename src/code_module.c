@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
 #include "code_module.h"
 #include "global.h"
 #include "object.h"
@@ -77,9 +76,8 @@ GDB_CALL void *fixed_address_copy(void *destination, const void *source, sint32 
     return memcpy(copy, source, (uint32)size);
 }
 
-GDB_CALL void game_psx_flush_cache(void *user)
+static void code_cache_flush(void)
 {
-    (void)user;
     /* Host code is not executed from the copied MIPS overlay. */
     ++g_psx_flush_cache_boundary_calls;
 }
@@ -94,7 +92,7 @@ GDB_CALL void overlay_module_load(char *filename)
         name_length = sizeof(g_code_module) - 1;
     memcpy(g_code_module, filename, name_length);
     g_code_module[name_length] = 0;
-    FlushCache();
+    code_cache_flush();
     size = game_file_size(filename);
     work = runtime_heap_allocate_sector_aligned(size);
     game_file_read(filename, work);

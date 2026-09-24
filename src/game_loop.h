@@ -1,7 +1,8 @@
 #ifndef MODULE_API_GAME_LOOP_H
 #define MODULE_API_GAME_LOOP_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "level_data.h"
 #include "mission.h"
 #include "render.h"

@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "collision.h"
 #include "global.h"
 #include "object.h"

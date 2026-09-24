@@ -1,17 +1,41 @@
 #include <stdlib.h>
-#include "../../global.h"
-#include "../../object.h"
-#include "app.h"
+#include "global.h"
+#include "object.h"
 #include "psx.h"
-#include "windows_compat.h"
+#include "psx_pad.h"
+
+static sint32 text_equal_ignore_case(const char *left, const char *right)
+{
+    uint8 a;
+    uint8 b;
+    do
+    {
+        a = (uint8)*left++;
+        b = (uint8)*right++;
+        if (a >= 'A' && a <= 'Z')
+            a = (uint8)(a + ('a' - 'A'));
+        if (b >= 'A' && b <= 'Z')
+            b = (uint8)(b + ('a' - 'A'));
+        if (a != b)
+            return 0;
+    } while (a != 0);
+    return 1;
+}
 
 GDB_CALL uint32 controllers_read(sint32 controller)
 {
+    static sint32 direct_pad_initialized;
     uint32 buttons = 0;
     /* The PSX routine ignored its argument and packed pads 1/2 into the low
      * and high 16 bits.  Hold Right Shift to route the I/J/K/L face-button
      * cluster to pad 2; the original cheat sequences contain pad-2 masks. */
-    (void)controller;
+
+    if (!direct_pad_initialized)
+    {
+        PadInitDirect(g_controller_packet, 0);
+        PadStartCom();
+        direct_pad_initialized = 1;
+    }
 
     if (getenv("OA_MUZZLE_LIGHT_TRACE") != 0)
     {
@@ -34,7 +58,7 @@ GDB_CALL uint32 controllers_read(sint32 controller)
             buttons = PADRright;
         else if (g_next_stage_index != 0)
         {
-            sint32 wanted = (_stricmp(mode, "hq") == 0) ? 2 : 1;
+            sint32 wanted = text_equal_ignore_case(mode, "hq") ? 2 : 1;
             /* Let FUN_800894b4 establish its initial selection and input
              * baseline before producing any menu edge. */
             if (menu_wait < 16)
@@ -71,10 +95,6 @@ GDB_CALL uint32 controllers_read(sint32 controller)
         buttons &= ~PADLright;
     if (buttons & PADLdown)
         buttons &= ~PADLup;
+    pad_publish(0, 1, (uint16)~buttons);
     return buttons;
-}
-
-sint32 app_quit_requested(void)
-{
-    return psx_quit_requested();
 }

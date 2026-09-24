@@ -3,7 +3,8 @@
 
 #include <stddef.h>
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* Types. */
 typedef void (*FUNC_COLLISION_UPDATE)(void *object);

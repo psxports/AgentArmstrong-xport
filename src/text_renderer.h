@@ -1,7 +1,8 @@
 #ifndef MODULE_API_TEXT_RENDERER_H
 #define MODULE_API_TEXT_RENDERER_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* Types. */
 typedef struct

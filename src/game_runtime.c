@@ -1,17 +1,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include "app.h"
-#include "audio/psyq_sound.h"
+#include "psx_gpu.h"
 #include "cc_archive.h"
 #include "code_module.h"
-#include "game_platform.h"
+#include "game_runtime.h"
+#include "game_loop.h"
 #include "global.h"
 #include "level_data.h"
 #include "model.h"
 #include "object.h"
 #include "original_file.h"
-#include "platform_file.h"
+#include "game_file.h"
 #include "player.h"
 #include "psx.h"
 #include "render.h"
@@ -19,7 +19,6 @@
 #include "runtime_heap.h"
 #include "sprite.h"
 #include "stubs.h"
-#include "windows_compat.h"
 
 /* Types. */
 typedef struct
@@ -119,15 +118,11 @@ static sint32 frame_number;
 
 static sint32 menu_background_active;
 
-static sint32 native_headless, smoke_frame_limit;
+static sint32 smoke_frame_limit;
 
 static sint32 smoke_wait_for_mission, smoke_mission_started;
 
 static sint32 display_offset_y;
-
-static sint32 native_music_id = -1, native_music_volume;
-
-static uint16 vram[VRAM_W * VRAM_H];
 
 static uint16 active_tpage;
 
@@ -189,15 +184,6 @@ static const uint8 *resource_script_direct;
 
 static sint32 resource_script_direct_size;
 
-/* Functions. */
-static void game_gpu_add_prim(void *user, void *ot, void *prim);
-static void game_gpu_add_prims(void *user, void *ot, void *first, void *last);
-static sint32 game_gpu_clear_image(void *user, PSX_RECT *rectangle, uint8 red, uint8 green, uint8 blue);
-static uint32 *game_gpu_clear_ot(void *user, uint32 *ot, sint32 count, sint32 reverse);
-static void game_gpu_draw_ot(void *user, uint32 *ot);
-static sint32 game_gpu_move_image(void *user, PSX_RECT *rectangle, sint32 x, sint32 y);
-static sint32 game_gpu_store_image(void *user, PSX_RECT *rectangle, uint32 *pixels);
-
 __declspec(dllexport) volatile uint32 g_psx_display_mode_boundary_calls;
 
 /* Native side of the low-level libcd/device routines called by the recovered
@@ -224,17 +210,16 @@ __declspec(dllexport) void *g_psx_cd_last_workspace;
 
 __declspec(dllexport) uint32 g_psx_resource_opcode_counts[10];
 
-static sint32 game_gpu_load_image(void *user, PSX_RECT *r, uint32 *p)
+static sint32 game_runtime_gpu_load_image(PSX_RECT *r, uint32 *p)
 {
     sint32 x, y;
     uint16 *s = (uint16 *)p;
-    (void)user;
     if (!r || !p)
         return -1;
     for (y = 0; y < r->h; y++)
         for (x = 0; x < r->w; x++)
             if ((uint32)(r->x + x) < VRAM_W && (uint32)(r->y + y) < VRAM_H)
-                vram[(r->y + y) * VRAM_W + r->x + x] = *s++;
+                VRAM[(r->y + y) * VRAM_W + r->x + x] = *s++;
     return 0;
 }
 
@@ -261,16 +246,16 @@ GDB_CALL sint32 tim_image_upload(void *raw)
     r = image->rectangle;
     r.x = g_render_frame_buffer_0.drawenv.clip.x;
     r.y = g_render_frame_buffer_0.drawenv.clip.y;
-    LoadImage(&r, (uint32 *)image->pixels);
+    LoadImagePSX(&r, (uint32 *)image->pixels);
     DrawSync(0);
     r.x = g_render_frame_buffer_1.drawenv.clip.x;
     r.y = g_render_frame_buffer_1.drawenv.clip.y;
-    LoadImage(&r, (uint32 *)image->pixels);
+    LoadImagePSX(&r, (uint32 *)image->pixels);
     DrawSync(0);
     if (clut)
     {
         r = clut->rectangle;
-        LoadImage(&r, (uint32 *)clut->pixels);
+        LoadImagePSX(&r, (uint32 *)clut->pixels);
         DrawSync(0);
     }
     return 1;
@@ -279,7 +264,6 @@ GDB_CALL sint32 tim_image_upload(void *raw)
 /* Original: FUN_800B3058. */
 GDB_CALL void display_mask_set(sint32 mode)
 {
-    (void)mode;
     ++g_psx_display_mode_boundary_calls;
 }
 
@@ -289,10 +273,6 @@ GDB_CALL void display_mask_set(sint32 mode)
  * ABI and debugger/call-database identity. */
 GDB_CALL void str_video_play(char *str_path, sint32 width, sint32 frames, sint32 mode)
 {
-    (void)str_path;
-    (void)width;
-    (void)frames;
-    (void)mode;
 }
 
 sint32 psx_cd_read_track_table(sint32 mode, void *workspace)
@@ -318,16 +298,6 @@ sint32 psx_cd_configure_driver(void)
 void psx_cd_stop_driver(void)
 {
     ++g_psx_cd_stop_driver_calls;
-}
-
-/* Host boundary for the PsyQ/libcd sync, track-range and volume command
- * sequence in FUN_800A99F0/FUN_800A9C24.  Native currently has no CD-DA
- * output device, but preserves the exact selected catalog entry and volume. */
-void psx_select_music_track(sint32 id, sint32 volume)
-{
-    native_music_id = id;
-    native_music_volume = volume;
-    psyq_sound_music_play(id, volume);
 }
 
 static void dump_ot_trace_once(void)
@@ -456,6 +426,20 @@ void psx_set_prim_screen_offset(sint32 x, sint32 y)
     prim_screen_offset_y = y;
 }
 
+static uint32 *prim_ot_take(sint32 fallback_bucket)
+{
+    sint32 bucket = prim_ot_bucket;
+    if (bucket < 0 && prim_world_depth >= 0)
+        bucket = (prim_world_depth - g_camera_world_z) >> 8;
+    if (bucket < 0 || bucket >= RENDER_OT_LENGTH)
+        bucket = fallback_bucket;
+    prim_world_depth = -1;
+    prim_ot_bucket = -1;
+    prim_screen_offset_x = 0;
+    prim_screen_offset_y = 0;
+    return g_current_render_frame->ot + bucket;
+}
+
 void psx_set_cell_sprite_light(const MAP_FLOOR_CELL *cell, sint32 cell_x, sint32 cell_z)
 {
     sint32 light = 0x80, map_light = 0;
@@ -485,57 +469,17 @@ sint32 psx_get_object_shade(void)
     return cell_sprite_light;
 }
 
-void psx_game_platform_configure(void)
+void game_runtime_configure(void)
 {
-    PSX_CONFIG config;
-    const char *smoke;
+    const char *smoke = getenv("OA_STAGE_SMOKE");
+    if (smoke != 0 && *smoke != '\0')
     {
-        char executable[MAX_PATH];
-        char *slash;
-        if (GetModuleFileName(0, executable, sizeof(executable)))
-        {
-            slash = strrchr(executable, '\\');
-            if (slash)
-            {
-                *slash = '\0';
-                SetCurrentDirectory(executable);
-            }
-        }
-    }
-    smoke = getenv("OA_STAGE_SMOKE");
-    if (smoke && *smoke)
-    {
-        native_headless = 1;
         smoke_frame_limit = (sint32)strtol(smoke, 0, 0);
         smoke_wait_for_mission = getenv("OA_STAGE_SMOKE_WAIT_RUNTIME") != 0;
         if (smoke_frame_limit < 1)
             smoke_frame_limit = 1;
-        SetErrorMode(SEM_FAILCRITICALERRORS | SEM_NOGPFAULTERRORBOX | SEM_NOOPENFILEERRORBOX);
     }
-    memset(&config, 0, sizeof(config));
-    config.window_title = "Agent Armstrong";
-    config.window_width = 960;
-    config.window_height = 768;
-    config.refresh_rate = 50;
-    config.headless = native_headless;
-    config.host.load_image = game_gpu_load_image;
-    config.host.move_image = game_gpu_move_image;
-    config.host.store_image = game_gpu_store_image;
-    config.host.clear_image = game_gpu_clear_image;
-    config.host.clear_ot = game_gpu_clear_ot;
-    config.host.add_prim = game_gpu_add_prim;
-    config.host.add_prims = game_gpu_add_prims;
-    config.host.draw_ot = game_gpu_draw_ot;
-    config.host.draw_sync = game_psx_draw_sync;
-    config.host.flush_cache = game_psx_flush_cache;
-    config.host.sound_initialize = game_psx_sound_initialize;
-    config.host.sound_shutdown = game_psx_sound_shutdown;
-    config.host.sound_set_tick_mode = game_psx_sound_set_tick_mode;
-    config.host.sound_start = game_psx_sound_start;
-    config.host.sound_set_master_volume = game_psx_sound_set_master_volume;
-    config.host.sound_set_serial_attributes = game_psx_sound_set_serial_attributes;
-    config.host.sound_set_serial_volume = game_psx_sound_set_serial_volume;
-    psx_configure(&config);
+    xport_set_headless(smoke != 0 && *smoke != '\0');
 }
 
 static void pxc(sint32 x, sint32 y, uint32 color)
@@ -619,70 +563,51 @@ void psx_set_display_offset_y(sint32 offset)
 
 sint32 psx_dump_vram(const char *path)
 {
-    return app_file_write(path, vram, sizeof(vram));
+    return app_file_write(path, VRAM, sizeof(VRAM));
 }
 
 void psx_end_frame(void)
 {
-    const uint32 *shown = fb;
-    sint32 dy, rows;
-    char title[80];
-    if (native_headless)
+    const char *dump_frame_text = getenv("OA_VRAM_FRAME_DUMP");
+    sint32 dump_frame = dump_frame_text && *dump_frame_text ? (sint32)strtol(dump_frame_text, 0, 0) : 0;
+    if (xport_is_headless())
     {
         if (smoke_wait_for_mission && !smoke_mission_started)
             return;
         ++frame_number;
+        if (dump_frame && frame_number == (dump_frame > 1 ? dump_frame : 30))
+            psx_dump_vram("VRAM_frame.raw");
         if (frame_number >= smoke_frame_limit)
         {
             const char *stage = getenv("OA_START_STAGE");
+            SsQuit();
             printf("STAGE_SMOKE_PASS stage=%s frames=%d\n", stage ? stage : "HQ", frame_number);
             fflush(stdout);
-            ExitProcess(0);
+            exit(0);
         }
         return;
     }
-    if (psx_quit_requested())
+    if (xport_isquit())
         return;
-    if (display_offset_y != 0)
-    {
-        dy = display_offset_y;
-        if (dy >= FH)
-            dy = FH;
-        if (dy <= -FH)
-            dy = -FH;
-        memset(present_fb, 0, sizeof(present_fb));
-        rows = FH - (dy < 0 ? -dy : dy);
-        if (rows > 0)
-        {
-            if (dy > 0)
-                memcpy(present_fb + dy * FW, fb, rows * FW * sizeof(*fb));
-            else
-                memcpy(present_fb, fb + (-dy) * FW, rows * FW * sizeof(*fb));
-        }
-        shown = present_fb;
-    }
+    gpu_display_offset(0, display_offset_y);
     ++frame_number;
-    if (frame_number == 30 && getenv("OA_VRAM_FRAME_DUMP"))
+    if (dump_frame && frame_number == (dump_frame > 1 ? dump_frame : 30))
         psx_dump_vram("VRAM_frame.raw");
-    if ((frame_number % 30) == 0)
-        sprintf(title, "OpenArmstrong - HQ wireframe - frame %d", frame_number);
-    psx_window_present(shown, FW, FH, (frame_number % 30) == 0 ? title : NULL);
+    gpu_present();
 }
 
 void psx_smoke_mission_start(void)
 {
-    if (native_headless && smoke_wait_for_mission)
+    if (xport_is_headless() && smoke_wait_for_mission)
     {
         frame_number = 0;
         smoke_mission_started = 1;
     }
 }
 
-static uint32 *game_gpu_clear_ot(void *user, uint32 *ot, sint32 count, sint32 reverse)
+static uint32 *game_runtime_gpu_clear_ot(uint32 *ot, sint32 count, sint32 reverse)
 {
     sint32 i;
-    (void)user;
-    (void)reverse;
     for (i = 0; i < count; i++)
         ot[i] = 0;
     native_ot_count = 0;
@@ -692,10 +617,9 @@ static uint32 *game_gpu_clear_ot(void *user, uint32 *ot, sint32 count, sint32 re
     return ot;
 }
 
-static void game_gpu_add_prim(void *user, void *ot, void *prim)
+static void game_runtime_gpu_add_prim(void *ot, void *prim)
 {
     sint32 linked_bucket = -1;
-    (void)user;
     if (g_current_render_frame)
     {
         sint32 bucket = prim_ot_bucket;
@@ -756,15 +680,15 @@ static void add_draw_area(void *ot, sint32 x0, sint32 x1)
     psx_add_draw_area_rect(ot, x0, x1, 0, FH);
 }
 
-static void game_gpu_add_prims(void *user, void *ot, void *p0, void *p1)
+static void game_runtime_gpu_add_prims(void *ot, void *p0, void *p1)
 {
     sint32 bucket = prim_ot_bucket, depth = prim_world_depth;
     psx_set_prim_ot_bucket(bucket);
     psx_set_prim_depth(depth);
-    game_gpu_add_prim(user, ot, p1);
+    game_runtime_gpu_add_prim(ot, p1);
     psx_set_prim_ot_bucket(bucket);
     psx_set_prim_depth(depth);
-    game_gpu_add_prim(user, ot, p0);
+    game_runtime_gpu_add_prim(ot, p0);
 }
 
 static uint32 rgb555(uint16 c)
@@ -784,25 +708,25 @@ static uint16 texel_indexed(sint32 u, sint32 v, uint16 tpage, uint16 clut, sint3
         return 0;
     if (tp == 0)
     {
-        w = vram[(ty + v) * VRAM_W + tx + (u >> 2)];
+        w = VRAM[(ty + v) * VRAM_W + tx + (u >> 2)];
         index = (w >> ((u & 3) * 4)) & 15;
     }
     else if (tp == 1)
     {
-        w = vram[(ty + v) * VRAM_W + tx + (u >> 1)];
+        w = VRAM[(ty + v) * VRAM_W + tx + (u >> 1)];
         index = (w >> ((u & 1) * 8)) & 255;
     }
     else
     {
         if ((uint32)(tx + u) >= VRAM_W)
             return 0;
-        color = vram[(ty + v) * VRAM_W + tx + u];
+        color = VRAM[(ty + v) * VRAM_W + tx + u];
         *transparent = color == 0;
         return color;
     }
     if ((uint32)(cx + index) >= VRAM_W)
         return 0;
-    color = vram[cy * VRAM_W + cx + index];
+    color = VRAM[cy * VRAM_W + cx + index];
     *transparent = color == 0;
     return color;
 }
@@ -1223,11 +1147,10 @@ static void draw_prim(void *raw)
 /* B36F4 forwards the supplied OT head unchanged (800B3730..800B3750).
  * FDC8C submits frame+4, not frame base: process bucket 1 and its tail.
  * The full-frame native caller uses the base as its explicit all-buckets API. */
-static void game_gpu_draw_ot(void *user, uint32 *ot)
+static void game_runtime_gpu_draw_ot(uint32 *ot)
 {
     sint32 bucket, first;
     ptrdiff_t delta;
-    (void)user;
     if (!g_current_render_frame || !ot)
         return;
     delta = (uint8 *)ot - (uint8 *)g_current_render_frame->ot;
@@ -1293,18 +1216,19 @@ GDB_CALL void end_frame_submit(sint32 mode)
         frame->drawenv.isbg = 1;
     g_render_frame_buffer_0.display_env.screen.h = (sint16)g_screen_height;
     g_render_frame_buffer_1.display_env.screen.h = (sint16)g_screen_height;
+    display_env_apply(&frame->display_env);
+    drawenv_apply(&frame->drawenv);
     frame->drawenv.isbg = 0;
     frame->drawenv.dtd = 0;
-    DrawOTag(frame->ot);
+    DrawOTag(&frame->ot[RENDER_OT_LENGTH - 1]);
     psx_end_frame();
     g_sound_handles_invalidated = 0;
     g_previous_held_buttons = g_held_buttons;
 }
 
-static sint32 game_gpu_move_image(void *user, PSX_RECT *r, sint32 x, sint32 y)
+static sint32 game_runtime_gpu_move_image(PSX_RECT *r, sint32 x, sint32 y)
 {
     sint32 row;
-    (void)user;
     if (!r)
         return -1;
     if (x < 0 || y < 0 || x + r->w > VRAM_W || y + r->h > VRAM_H)
@@ -1316,35 +1240,33 @@ static sint32 game_gpu_move_image(void *user, PSX_RECT *r, sint32 x, sint32 y)
     }
     if (y > r->y)
         for (row = r->h - 1; row >= 0; row--)
-            memmove(&vram[(y + row) * VRAM_W + x], &vram[(r->y + row) * VRAM_W + r->x], r->w * 2);
+            memmove(&VRAM[(y + row) * VRAM_W + x], &VRAM[(r->y + row) * VRAM_W + r->x], r->w * 2);
     else
         for (row = 0; row < r->h; row++)
-            memmove(&vram[(y + row) * VRAM_W + x], &vram[(r->y + row) * VRAM_W + r->x], r->w * 2);
+            memmove(&VRAM[(y + row) * VRAM_W + x], &VRAM[(r->y + row) * VRAM_W + r->x], r->w * 2);
     return 0;
 }
 
-static sint32 game_gpu_store_image(void *user, PSX_RECT *r, uint32 *p)
+static sint32 game_runtime_gpu_store_image(PSX_RECT *r, uint32 *p)
 {
     sint32 row;
-    (void)user;
     if (!r || !p)
         return -1;
     for (row = 0; row < r->h; row++)
-        memcpy((uint16 *)p + row * r->w, &vram[(r->y + row) * VRAM_W + r->x], r->w * 2);
+        memcpy((uint16 *)p + row * r->w, &VRAM[(r->y + row) * VRAM_W + r->x], r->w * 2);
     return 0;
 }
 
-static sint32 game_gpu_clear_image(void *user, PSX_RECT *r, uint8 rr, uint8 gg, uint8 bb)
+static sint32 game_runtime_gpu_clear_image(PSX_RECT *r, uint8 rr, uint8 gg, uint8 bb)
 {
     sint32 x, y;
     uint16 c = (uint16)((rr >> 3) | ((gg >> 3) << 5) | ((bb >> 3) << 10));
-    (void)user;
     if (!r)
         return -1;
     for (y = 0; y < r->h; y++)
         for (x = 0; x < r->w; x++)
             if ((uint32)(r->x + x) < VRAM_W && (uint32)(r->y + y) < VRAM_H)
-                vram[(r->y + y) * VRAM_W + r->x + x] = c;
+                VRAM[(r->y + y) * VRAM_W + r->x + x] = c;
     return 0;
 }
 
@@ -1587,7 +1509,6 @@ GDB_CALL void stage_models_queue_load(sint32 unused, sint16 *base, sint16 count,
 {
     PendingStageModels *pending;
     sint32 size = data == resource_script_direct ? resource_script_direct_size : g_archive_member_size;
-    (void)unused;
     if (pending_stage_models_count >= 8)
         return;
     pending = &pending_stage_models[pending_stage_models_count++];
@@ -1960,7 +1881,7 @@ void psx_submit_map_ft3(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, s
     p->u2 = (uint8)(uv[6] + s->u);
     p->v2 = (uint8)(uv[7] + s->v);
     trace_model_packet((const uint8 *)p);
-    AddPrim(g_current_render_frame->ot + 2, p);
+    AddPrim(prim_ot_take(2), p);
 }
 
 void psx_submit_map_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, sint32 y2, sint32 x3, sint32 y3, const sint16 *uv, sint32 texture, sint32 shade)
@@ -1996,7 +1917,7 @@ void psx_submit_map_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, s
     p->u3 = (uint8)(uv[6] + s->u);
     p->v3 = (uint8)(uv[7] + s->v);
     trace_model_packet((const uint8 *)p);
-    AddPrim(g_current_render_frame->ot + 2, p);
+    AddPrim(prim_ot_take(2), p);
 }
 
 sint32 psx_get_map_texture_info(sint32 texture, PSXMapTextureInfo *out)
@@ -2043,7 +1964,7 @@ void psx_submit_prepared_model_ft3(sint32 x0, sint32 y0, sint32 x1, sint32 y1, s
         p->clut = model_clut_override;
     trace_hierarchy_packet(p);
     trace_model_packet((const uint8 *)p);
-    AddPrim(g_current_render_frame->ot + 2, p);
+    AddPrim(prim_ot_take(2), p);
 }
 
 void psx_submit_prepared_model_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, sint32 y2, sint32 x3, sint32 y3, const uint8 *source, sint32 shade)
@@ -2066,7 +1987,7 @@ void psx_submit_prepared_model_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, s
         p->clut = model_clut_override;
     trace_hierarchy_packet((const POLY_FT3 *)p);
     trace_model_packet((const uint8 *)p);
-    AddPrim(g_current_render_frame->ot + 2, p);
+    AddPrim(prim_ot_take(2), p);
 }
 
 sint32 psx_get_cell_frame_objects(sint32 cell_x, sint32 cell_z, FrameObjectPartial **out)
@@ -2369,7 +2290,7 @@ void psx_draw_floor_tile(sint32 a, sint32 b, sint32 c, sint32 d, sint32 e, sint3
             }
         }
     }
-    AddPrim(g_current_render_frame->ot + 2, p);
+    AddPrim(prim_ot_take(2), p);
 }
 
 /* Original CELLSDAT/model ordering boundary, 0x80094548.  The native
@@ -2381,7 +2302,6 @@ void map_cell_objects_render(MAP_FLOOR_CELL *cell, uint8 *bucket, sint32 world_x
     sint32 x = world_x >> 14;
     sint32 z = (g_map_depth_cells * 0xc000 - row_front) / 0x4000 - 1;
     MAP_MODEL_GROUP *group;
-    (void)bucket;
     if (cell == 0 || x < 0 || x >= g_map_width_cells || z < 0 || z >= g_map_depth_cells)
         return;
     trace_cell_x = x;
@@ -2405,7 +2325,6 @@ void map_floor_tile_render(uint32 *packet, sint32 row_back, sint32 X, MAP_FLOOR_
 {
     sint32 y00, y10, y01, y11, a, b, c, d, e, f, g, h, back_depth, front_depth, slope, orientation, tile, material, special, row_front;
     MAP_FLOOR_CELL *next;
-    (void)packet;
     if (!cell)
         return;
     row_front = row_back - 0x4000;
@@ -2451,19 +2370,16 @@ void map_floor_tile_render(uint32 *packet, sint32 row_back, sint32 X, MAP_FLOOR_
     front_depth = row_front - g_camera_world_z;
     if (back_depth <= 0 || front_depth <= 0)
         return;
-    /* Exact 80093620..80093BB8 projection. Coordinates are made absolute here
-  * by adding FUN_8008EB88's PAL draw offset (160,64). The right edge is the
-  * left projection plus 0x4000*0x140/depth + 1, exactly as DAT_800D408C and
-  * DAT_800D41C4 are computed by FUN_80093DE0. */
-    a = 160 + (X - g_camera_world_x) * 0x140 / back_depth;
+    /* Keep packet coordinates relative to DRAWENV.ofs=(160,64) */
+    a = (X - g_camera_world_x) * 0x140 / back_depth;
     c = a + 0x500000 / back_depth + 1;
-    g = 160 + (X - g_camera_world_x) * 0x140 / front_depth;
+    g = (X - g_camera_world_x) * 0x140 / front_depth;
     e = g + 0x500000 / front_depth + 1;
-    b = 64 + (y00 - g_camera_world_y) * 0x163 / back_depth;
-    d = 64 + (y10 - g_camera_world_y) * 0x163 / back_depth;
-    h = 64 + (y01 - g_camera_world_y) * 0x163 / front_depth + 1;
-    f = 64 + (y11 - g_camera_world_y) * 0x163 / front_depth + 1;
-    if ((b - 64) >= 0xe1 && (d - 64) >= 0xe1)
+    b = (y00 - g_camera_world_y) * 0x163 / back_depth;
+    d = (y10 - g_camera_world_y) * 0x163 / back_depth;
+    h = (y01 - g_camera_world_y) * 0x163 / front_depth + 1;
+    f = (y11 - g_camera_world_y) * 0x163 / front_depth + 1;
+    if (b >= 0xe1 && d >= 0xe1)
         return;
     if ((sint8)cell->material != -1)
     {

@@ -1,4 +1,3 @@
-#include "app.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "global.h"
@@ -225,11 +224,9 @@ sint32 g_vsync_count_this_frame;
 /* Original: DAT_800FEAA4. */
 uint8 g_hq_weapon_area_enabled;
 
-/* Native pad packet used by FUN_800AEED4.  Byte 0xff means disconnected;
- * the high nibble of byte 1 is the original PsyQ controller type (4=digital
- * pad).  The Windows keyboard backend exposes one connected digital pad. */
+/* Native pad packet used by FUN_800AEED4 */
 /* Original: DAT_800E33D0. */
-uint8 g_controller_packet[2] = {0, 0x40};
+uint8 g_controller_packet[8];
 
 /* Original: DAT_800E3398. */
 sint32 g_vsync_count_total;
@@ -597,7 +594,6 @@ sint32 g_map_depth_cells;
 sint32 g_screen_half_width;
 
 /* Original: DAT_800D3F98. */
-sint32 g_cd_sync_state;
 
 /* Original: DAT_800D3FCC. */
 sint32 g_hq_world_map_active;

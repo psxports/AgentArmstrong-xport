@@ -1,7 +1,6 @@
 #include <stddef.h>
 #include <string.h>
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "collision.h"
 #include "effect_update.h"

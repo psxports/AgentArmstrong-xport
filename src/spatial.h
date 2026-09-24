@@ -1,7 +1,8 @@
 #ifndef MODULE_API_SPATIAL_H
 #define MODULE_API_SPATIAL_H
 
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
 void spatial_buckets_build(void);

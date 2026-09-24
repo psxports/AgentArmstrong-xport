@@ -4,7 +4,8 @@
 #include <stddef.h>
 
 #include "animation.h"
-#include "app.h"
+#include "xport.h"
+#include "psx.h"
 #include "collision.h"
 #include "effect_update.h"
 #include "model.h"

@@ -3,8 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "animation.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "cc_archive.h"
 #include "code_module.h"
@@ -19,8 +18,8 @@
 #include "object.h"
 #include "original_file.h"
 #include "original_tables.h"
-#include "platform/win/game_platform.h"
-#include "platform/win/platform_file.h"
+#include "game_runtime.h"
+#include "game_file.h"
 #include "player.h"
 #include "projectile.h"
 #include "psx.h"
@@ -814,8 +813,6 @@ COLLISION_RESULT *runtime_object_collision_resolve(sint32 old_x, sint32 old_y, s
     sint32 start = (cell_x + cell_z * g_map_width_cells - 1 - g_map_width_cells);
     sint32 row = 0, visited = 0;
     uint8 *cell = g_dynamic_collision_cell_anchors + start * 8;
-    (void)old_x;
-    (void)old_y;
     dynamic_result.x = new_x;
     dynamic_result.y = new_y;
     dynamic_result.z = new_z;
@@ -1510,7 +1507,7 @@ GDB_CALL sint16 menu_run(void *raw_entries, sint32 x, sint32 y)
                 if (volume < 0)
                     volume += 0x7f;
                 volume >>= 7;
-                SsSetSerialVol(0, (sint16)volume, (sint16)volume);
+                SsSetSerialVol(SS_SERIAL_A, (sint16)volume, (sint16)volume);
             }
         }
         if (selected->result == 'L')
@@ -1561,7 +1558,7 @@ GDB_CALL sint16 menu_run(void *raw_entries, sint32 x, sint32 y)
         menu_backdrop(left, top, width, height);
         end_frame_submit(1);
         g_sound_handles_invalidated = 1;
-        if ((g_pressed_buttons & 0x40) != 0 || psx_quit_requested())
+        if ((g_pressed_buttons & 0x40) != 0 || xport_isquit())
             break;
     }
     cd_audio_play();
@@ -3285,7 +3282,7 @@ void player_action_effect_create(EFFECT *effect)
     PLAYER_ACTION *object = player_action_object_create(effect->x, effect->y, effect->z, source_type);
     object->owner_effect = effect;
     effect->type = 0;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 29 && getenv("OA_STAGE29_TRACE") && (source_type == 0x89 || source_type == 0x8c))
     {
         FILE *f = fopen("../status/chemical-vats-native.log", source_type == 0x89 ? "w" : "a");
@@ -3635,6 +3632,7 @@ void player_ammunition_regenerate(void)
         uint8 field_000[0x1b2];
         sint16 ammunition; /* +0x1B2 */
     } PLAYER_AMMUNITION_VIEW;
+
     if (g_player->ammunition < 0x14 && (g_frame_counter & 0xf) == 0)
         g_player->ammunition = (sint16)(g_player->ammunition + 1);
 }

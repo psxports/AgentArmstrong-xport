@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "airship.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "code_module.h"
 #include "collision.h"
 #include "effect_update.h"
@@ -207,7 +206,7 @@ static void v2_rocket_update(V2_ACTOR *o)
 {
     MODEL_NODE *root = &o->nodes[0], *jet = &o->nodes[5];
     SOUND_VOLUME_PAIR *volume;
-    SPU_voice_attributes *voice;
+    SpuVoiceAttr *voice;
     SPRITE *p;
     sint32 step, q, n, mode = o->mode;
     if (o->velocity_y >= -255 && mode != 3)
@@ -256,7 +255,7 @@ static void v2_rocket_update(V2_ACTOR *o)
             voice = sound_voice_spatial_volume_update(volume, o->flight_sound_handle);
             if (voice != 0 && voice->pitch >= 0x101 && o->launch_ticks >= 0x101)
             {
-                voice->attribute_mask = 0x10;
+                voice->mask = SPU_VOICE_PITCH;
                 --voice->pitch;
                 sound_voice_attributes_apply(voice);
             }
@@ -411,7 +410,7 @@ void v2_rocket_create(EFFECT *e)
     }
     if (g_stage_index == 14)
         o->forced_launch = 1;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (g_stage_index == 25 && getenv("OA_STAGE25_TRACE"))
     {
         FILE *file = fopen("../status/v2-jungle-native.log", "w");

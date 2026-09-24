@@ -2,8 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "airship.h"
-#include "app.h"
-#include "audio/game_sound.h"
+#include "game_sound.h"
 #include "camera.h"
 #include "effect_update.h"
 #include "global.h"
@@ -114,7 +113,7 @@ void jungle_animated_effect_update(EFFECT *effect)
     g_next_frame_object->light_delta = -0x20;
     g_next_frame_object->force_light = 1;
     render_world_sprite((uint32)(0x2e800 + old_frame), effect->x, effect->y + 0x2000, effect->z, 0, 0x1000, 0x1000, prim, 0, 2, 0, 0);
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     if (getenv("OA_STAGE22_TRACE"))
     {
         FILE *file = fopen("../status/river-action-native.log", "a");
@@ -510,7 +509,7 @@ sint32 effect_is_visible(EFFECT *effect)
 void effects_update_visible(void)
 {
     sint32 i;
-#ifdef AP_WIN
+#ifdef XPORT_NATIVE
     {
         static sint32 airfield_trace_frame;
         const char *trace = getenv("OA_AIRFIELD_TRACE");
