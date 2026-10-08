@@ -413,7 +413,7 @@ void v2_rocket_create(EFFECT *e)
 #ifdef XPORT_NATIVE
     if (g_stage_index == 25 && getenv("OA_STAGE25_TRACE"))
     {
-        FILE *file = fopen("../status/v2-jungle-native.log", "w");
+        FILE *file = xport_fopen("../status/v2-jungle-native.log", "w");
         if (file)
         {
             fprintf(file, "V2_JUNGLE_NATIVE_CTOR xyz=%d,%d,%d health=%d markers=%d mode=%d update=800faf94\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->marker_count, o->mode);

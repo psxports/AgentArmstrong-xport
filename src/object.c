@@ -16,8 +16,9 @@
  * Resident helper shared by AIRSHIP/SCUBA callers, not an overlay copy.
  * MIPS writes CLUT at DAT_800D401C - 0x1A, unlike FUN_80096B28,
  * which writes the embedded primitive at object + 0x52. */
-void object_hit_flash_apply(FLASHABLE *object)
+void object_hit_flash_apply(void *object_value)
 {
+    FLASHABLE *object = (FLASHABLE *)object_value;
     if (object->flash_clut_ticks != 0)
     {
         --object->flash_clut_ticks;
@@ -70,9 +71,11 @@ void linked_list_append(void *anchor_value, void *object_value)
  * limit constructors use this with the sentinel so their callbacks run
  * before the player callback in FUN_8008BFBC. */
 /* Original: FUN_8008BF48. */
-void linked_list_insert_after(void *anchor_value, OBJECT *object, OBJECT *after)
+void linked_list_insert_after(void *anchor_value, void *object_value, void *after_value)
 {
     OBJECT **anchor = (OBJECT **)anchor_value;
+    OBJECT *object = (OBJECT *)object_value;
+    OBJECT *after = (OBJECT *)after_value;
     OBJECT *next = (OBJECT *)after->next;
     if (next != 0)
         next->previous = object;
@@ -112,9 +115,10 @@ sint16 object_count_by_type(sint16 object_type)
 }
 
 /* Original: FUN_8008BF8C. */
-void linked_list_unlink(void *anchor_value, OBJECT *object)
+void linked_list_unlink(void *anchor_value, void *object_value)
 {
     OBJECT **anchor;
+    OBJECT *object = (OBJECT *)object_value;
     OBJECT *previous;
     OBJECT *next;
 
@@ -164,8 +168,10 @@ __declspec(noinline) void *object_destroy_all_by_type(sint16 type)
 }
 
 /* Original: FUN_800A16F8. */
-GDB_CALL void *destroyable_object_damage_and_reward(COLLISION *target, COLLISION *source)
+GDB_CALL void *destroyable_object_damage_and_reward(void *target_value, void *source_value)
 {
+    COLLISION *target = (COLLISION *)target_value;
+    COLLISION *source = (COLLISION *)source_value;
     SPRITE *actor;
     VRAM_SPRITE *resource;
     const sint32 *animation;

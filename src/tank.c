@@ -118,7 +118,7 @@ static void tank_update(TANK_ACTOR *o)
     if (!traced && getenv("OA_STAGE23_TRACE"))
     {
         uint8 before = g_objective_counts[12];
-        FILE *f = fopen("../status/spank-the-tank-native.log", "a");
+        FILE *f = xport_fopen("../status/spank-the-tank-native.log", "a");
         if (f)
         {
             fprintf(f, "TANK_NATIVE_UPDATE xyz=%d,%d,%d health=%d route=%d\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->route_index);
@@ -126,7 +126,7 @@ static void tank_update(TANK_ACTOR *o)
         }
         o->collision.receives_mask = 0;
         tank_damage(&o->collision, &o->collision);
-        f = fopen("../status/spank-the-tank-native.log", "a");
+        f = xport_fopen("../status/spank-the-tank-native.log", "a");
         if (f)
         {
             fprintf(f, "TANK_NATIVE_DAMAGE health=%d counter12_before=%u counter12_after=%u\n", o->health, (unsigned)before, (unsigned)g_objective_counts[12]);
@@ -309,7 +309,7 @@ void tank_create(EFFECT *e)
 #ifdef XPORT_NATIVE
     if (getenv("OA_STAGE23_TRACE"))
     {
-        FILE *f = fopen("../status/spank-the-tank-native.log", "w");
+        FILE *f = xport_fopen("../status/spank-the-tank-native.log", "w");
         if (f)
         {
             fprintf(f, "TANK_NATIVE_CTOR xyz=%d,%d,%d health=%d route_count=%d damage=800ae68c update=800add80\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->route_count);

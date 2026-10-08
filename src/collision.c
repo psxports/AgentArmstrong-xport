@@ -45,8 +45,9 @@ void object_collisions_dispatch(void)
 }
 
 /* Original: FUN_8009875C. */
-GDB_CALL void collision_box_set(COLLISION *object, sint32 width, sint32 height, sint32 depth)
+GDB_CALL void collision_box_set(void *object_value, sint32 width, sint32 height, sint32 depth)
 {
+    COLLISION *object = (COLLISION *)object_value;
     object->width = width << 8;
     object->height = height << 8;
     object->depth = depth << 8;
@@ -56,8 +57,10 @@ GDB_CALL void collision_box_set(COLLISION *object, sint32 width, sint32 height, 
 }
 
 /* Direct FUN_800987B4 damage/impact counter callback. */
-sint16 object_damage_apply(FLASHABLE *target, FLASHABLE *source)
+sint16 object_damage_apply(void *target_value, void *source_value)
 {
+    FLASHABLE *target = (FLASHABLE *)target_value;
+    FLASHABLE *source = (FLASHABLE *)source_value;
     sint16 value = (sint16)((uint16)target->field_78 - (uint16)source->field_78);
     sint16 type = source->collision.object_type;
     target->field_78 = value;

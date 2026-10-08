@@ -766,7 +766,7 @@ void tower_surface_trigger_update(EFFECT *effect)
 #ifdef XPORT_NATIVE
     if (g_stage_index == 28 && getenv("OA_STAGE28_TRACE"))
     {
-        FILE *f = fopen("../status/the-tower-native.log", "w");
+        FILE *f = xport_fopen("../status/the-tower-native.log", "w");
         if (f)
         {
             fprintf(f, "THE_TOWER_NATIVE effect=%d,%d,%d player=%d,%d,%d value=%d flag=%d\n", effect->x, effect->y, effect->z, g_player_world_x, g_player_world_y, g_player_world_z, (sint16)effect->values[0], g_player->surface_state);
@@ -819,7 +819,7 @@ void falling_hazard_create(EFFECT *effect)
     if (g_stage_index == 26 && getenv("OA_STAGE26_TRACE"))
     {
         sint32 player_x = g_player_world_x;
-        FILE *file = fopen("../status/subterranea-native.log", "w");
+        FILE *file = xport_fopen("../status/subterranea-native.log", "w");
         if (file)
         {
             fprintf(file, "SUBTERRANEA_NATIVE_CTOR xyz=%d,%d,%d health=%d flags=%d node_model=%d update=800a3b04\n", object->collision.x, object->collision.y, object->collision.z, object->damage, object->collision.receives_mask, node->model_id);
@@ -828,7 +828,7 @@ void falling_hazard_create(EFFECT *effect)
         g_player_world_x = object->collision.x - 1;
         object->velocity_y = 1000;
         falling_hazard_bounce(object);
-        file = fopen("../status/subterranea-native.log", "a");
+        file = xport_fopen("../status/subterranea-native.log", "a");
         if (file)
         {
             fprintf(file, "SUBTERRANEA_NATIVE_UPDATE vx=%d vy=%d vz=%d\n", object->velocity_x, object->velocity_y, object->velocity_z);
@@ -1023,7 +1023,7 @@ void mission_enemy_fire(MISSION_ENEMY_ACTOR *object)
         static sint32 shots;
         if (shots < 8)
         {
-            FILE *trace = fopen("mission_enemy_port.log", shots ? "a" : "w");
+            FILE *trace = xport_fopen("mission_enemy_port.log", shots ? "a" : "w");
             if (trace)
             {
                 fprintf(trace, "SHOT %d tick=%u object=%p type=%d dir=%d alt=%d xyz=%08x,%08x,%08x target=%08x,%08x,%08x\n", shots, g_frame_counter, object, (sint32)object->collision.object_type, (sint32)object->display_direction, (sint32)object->alternate_attack, (uint32)object->collision.x, (uint32)object->collision.y, (uint32)object->collision.z, (uint32)object->target_x, (uint32)object->target_y, (uint32)object->target_z);
@@ -1070,7 +1070,7 @@ void mission_enemy_update(MISSION_ENEMY_ACTOR *object)
         {
             sint16 route = object->route_index;
             EFFECT *waypoint = object->route_points[route];
-            FILE *trace = fopen("mission_enemy_state_port.log", count ? "a" : "w");
+            FILE *trace = xport_fopen("mission_enemy_state_port.log", count ? "a" : "w");
             if (trace)
             {
                 fprintf(trace, "STATE %d tick=%u object=%p xyz=%08x,%08x,%08x attack=%d secondary=%d timer=%d turn=%d route=%d/%d waypoint=%p dest=%08x,%08x velocity=%08x,%08x,%08x\n", count, g_frame_counter, object, (uint32)object->collision.x, (uint32)object->collision.y, (uint32)object->collision.z, (sint32)object->attack_active, (sint32)object->secondary_active, (sint32)object->attack_countdown, (sint32)object->turn_countdown, (sint32)route, (sint32)object->route_count, (void *)waypoint, (uint32)waypoint->x, (uint32)waypoint->z, (uint32)object->movement_line[0], (uint32)object->movement_line[1], (uint32)object->movement_line[2]);
@@ -1484,7 +1484,7 @@ void airfield_enemy_fire(MISSION_ENEMY_ACTOR *object)
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
         {
-            FILE *file = fopen("../status/airfield-native.log", "a");
+            FILE *file = xport_fopen("../status/airfield-native.log", "a");
             if (file)
             {
                 fprintf(file, "AIRFIELD_NATIVE_ATTACK xyz=%d,%d,%d velocity=%d,%d,%d type=%d\n", projectile->collision.x, projectile->collision.y, projectile->collision.z, projectile->motion[3], projectile->motion[4], projectile->motion[5], projectile->collision.object_type);
@@ -1517,8 +1517,9 @@ void airfield_enemy_configure(MISSION_ENEMY_ACTOR *object)
 
 /* Direct translation of 0x800A20F8..0x800A2194. */
 /* Original: FUN_800A20F8. */
-sint32 route_waypoints_collect(sint16 route, sint16 index_bias, EFFECT **waypoints)
+sint32 route_waypoints_collect(sint16 route, sint16 index_bias, void *waypoints_value)
 {
+    EFFECT **waypoints = (EFFECT **)waypoints_value;
     EFFECT *effect = 0;
     sint16 count = 0;
     while ((effect = effect_find_next(0x1e, effect)) != 0)
@@ -1551,7 +1552,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
         {
-            FILE *file = fopen("../status/airfield-native.log", "w");
+            FILE *file = xport_fopen("../status/airfield-native.log", "w");
             if (file)
             {
                 fprintf(file, "AIRFIELD_NATIVE_HANDLER type=%d route=%d xyz=%d,%d,%d\n", source_type, (sint16)source->values[0], source->x, source->y, source->z);
@@ -1751,7 +1752,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
         {
-            FILE *file = fopen("../status/airfield-native.log", "a");
+            FILE *file = xport_fopen("../status/airfield-native.log", "a");
             if (file)
             {
                 fprintf(file, "AIRFIELD_NATIVE_CTOR type=%d health=%d speed=%d range=%d route_count=%d xyz=%d,%d,%d\n", object->collision.object_type, object->attack_delay, object->movement_speed, object->render_resource, object->route_count, object->collision.x, object->collision.y, object->collision.z);
@@ -2157,8 +2158,9 @@ MISSION_TIMER_DISPLAY *mission_timer_display_create(sint32 x, sint32 y, sint32 z
 
 /* Direct translation of 0x800A087C..0x800A092C. */
 /* Original: FUN_800A087C. */
-void hud_bar_initialize(MISSION_HUD_BAR *hud, sint32 x, sint32 y, sint32 width, sint32 maximum)
+void hud_bar_initialize(void *hud_value, sint32 x, sint32 y, sint32 width, sint32 maximum)
 {
+    MISSION_HUD_BAR *hud = (MISSION_HUD_BAR *)hud_value;
     POLY_G4 *fill = &hud->fill;
     POLY_F4 *border = &hud->border;
     hud->x = x;
@@ -2180,8 +2182,9 @@ void hud_bar_initialize(MISSION_HUD_BAR *hud, sint32 x, sint32 y, sint32 width, 
 
 /* Direct translation of 0x800A0930..0x800A0BEC. */
 /* Original: FUN_800A0930. */
-void hud_bar_render(MISSION_HUD_BAR *hud, sint32 amount, sint32 unused, sint32 zero_width)
+void hud_bar_render(void *hud_value, sint32 amount, sint32 unused, sint32 zero_width)
 {
+    MISSION_HUD_BAR *hud = (MISSION_HUD_BAR *)hud_value;
     POLY_G4 *fill = &hud->fill;
     POLY_F4 *border = &hud->border;
     sint32 maximum = hud->maximum;
@@ -2297,7 +2300,7 @@ void mission_hud_render(void)
             static sint32 frames;
             if (frames < 4)
             {
-                FILE *trace = fopen(strcmp(trace_name, "1") == 0 ? "mission_hud_port.log" : trace_name, frames ? "a" : "w");
+                FILE *trace = xport_fopen(strcmp(trace_name, "1") == 0 ? "mission_hud_port.log" : trace_name, frames ? "a" : "w");
                 if (trace)
                 {
                     fprintf(trace, "HUD %d tick=%u score=%u health=%u weapon=%u ammo=%u icon=%08x target=%d primary=%d secondary=%d\n", frames, g_frame_counter, (uint32)(uint16)player->ammunition, (uint32)player->health, (uint32)g_selected_weapon_slot, (uint32)weapon->count, (uint32)weapon->frame_id, (sint32)g_target_indicator_enabled, g_primary_objective_count, g_secondary_objective_count);

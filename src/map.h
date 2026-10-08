@@ -59,7 +59,7 @@ sint32 map_floor_height_at(sint32 world_x, sint32 current_y, sint32 world_z);
 sint32 model_attribute_find(sint16 model_id);
 void horizontal_camera_limit_create(EFFECT *source);
 void map_grid_initialize(void);
-void map_light_stamp_apply(sint32 world_x, sint32 world_z, sint16 clear, const MAP_STAMP *stamp);
+void map_light_stamp_apply(sint32 world_x, sint32 world_z, sint16 clear, const void *stamp_value);
 void map_runtime_initialize(sint32 width, sint32 height);
 void room_camera_limits_update(void);
 void room_depth_limit_create(void);

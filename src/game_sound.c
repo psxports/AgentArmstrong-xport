@@ -277,8 +277,9 @@ uint16 sound_play_positional(sint32 id, sint32 note_delta, sint32 type, sint32 x
 }
 
 /* Original: FUN_800AAA7C. */
-SpuVoiceAttr *sound_voice_spatial_volume_update(SOUND_VOLUME_PAIR *volume, sint32 handle)
+SpuVoiceAttr *sound_voice_spatial_volume_update(const void *volume_value, sint32 handle)
 {
+    const SOUND_VOLUME_PAIR *volume = (const SOUND_VOLUME_PAIR *)volume_value;
     sint32 left, right;
     if (handle < 0 || handle >= 24 || !volume)
         return 0;

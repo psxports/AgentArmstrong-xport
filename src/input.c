@@ -2,7 +2,7 @@
 #include "global.h"
 #include "object.h"
 #include "psx.h"
-#include "psx_pad.h"
+#include "psx.h"
 
 static sint32 text_equal_ignore_case(const char *left, const char *right)
 {

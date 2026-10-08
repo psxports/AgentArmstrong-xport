@@ -22,7 +22,7 @@ typedef char ObjectNode_update_at_0c[offsetof(OBJECT, update) == 0x0c ? 1 : -1];
 #endif
 
 /* BEGIN GENERATED MODULE API */
-GDB_CALL void *destroyable_object_damage_and_reward(COLLISION *target, COLLISION *source);
+GDB_CALL void *destroyable_object_damage_and_reward(void *target_value, void *source_value);
 GDB_CALL void *object_create(sint32 size, FUNC_COLLISION_UPDATE callback);
 GDB_CALL void *object_find_next_by_type(void *after, sint16 object_type);
 GDB_CALL void linked_list_initialize(void *anchor_value);
@@ -30,10 +30,10 @@ GDB_CALL void object_destroy(void *object);
 GDB_CALL void object_list_update(void);
 __declspec(noinline) void *object_destroy_all_by_type(sint16 type);
 sint16 object_count_by_type(sint16 object_type);
-void object_hit_flash_apply(FLASHABLE *object);
+void object_hit_flash_apply(void *object_value);
 void linked_list_append(void *anchor_value, void *object_value);
-void linked_list_insert_after(void *anchor_value, OBJECT *object, OBJECT *after);
-void linked_list_unlink(void *anchor_value, OBJECT *object);
+void linked_list_insert_after(void *anchor_value, void *object_value, void *after_value);
+void linked_list_unlink(void *anchor_value, void *object_value);
 /* END GENERATED MODULE API */
 
 #endif

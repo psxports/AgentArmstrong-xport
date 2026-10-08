@@ -42,7 +42,7 @@ static sint32 mac_shift12(sint64 value)
     return -(sint32)(((-value) + 0xfff) >> 12);
 }
 
-MATRIX *MulMatrix0(MATRIX *m0, MATRIX *m1, MATRIX *m2)
+static MATRIX *model_mul_matrix0(MATRIX *m0, MATRIX *m1, MATRIX *m2)
 {
     MATRIX out;
     sint32 row, column;
@@ -330,7 +330,7 @@ sint32 model_load(const void *source, sint32 size, sint32 count)
     }
     if (getenv("OA_MODEL_TRACE"))
     {
-        FILE *trace = fopen("model_descriptors_port.csv", "w");
+        FILE *trace = xport_fopen("model_descriptors_port.csv", "w");
         if (trace)
         {
             fprintf(trace, "model,half_x,half_y,half_z\n");
@@ -386,7 +386,7 @@ sint32 model_dump_parser_audit(const char *path)
     packet_count = (sint32)(uint16)g_model_packet_count;
     if (packet_count > 0x226)
         packet_count = 0x226;
-    file = fopen(path, "wb");
+    file = xport_fopen(path, "wb");
     if (file == 0)
         return 0;
     fwrite(magic, 1, 4, file);
@@ -1074,7 +1074,7 @@ void model_render_node(MODEL_NODE *node, MATRIX *parent)
     if (!node || !parent || g_render_depth_bucket >= 0x3e9)
         return;
     model_build_local_matrix(node);
-    MulMatrix0(parent, &node->local_matrix, &world);
+    model_mul_matrix0(parent, &node->local_matrix, &world);
     local_translation.vx = node->local_matrix.t[0];
     local_translation.vy = node->local_matrix.t[1];
     local_translation.vz = node->local_matrix.t[2];

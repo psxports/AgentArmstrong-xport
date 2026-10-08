@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "cd.h"
+#include "game_runtime.h"
 #include "global.h"
 
 /* PAL 0x800B85F4 is the BIOS DeliverEvent gate (t1=7, jump 0xB0).

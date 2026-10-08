@@ -272,10 +272,10 @@ void player_checkpoint_recovery_begin(PLAYER *player);
 void player_checkpoint_recovery_update(PLAYER *player);
 void player_control_update(void *raw_player);
 void player_death_begin(void);
-void player_debug_movement_update(PLAYER *player);
+void player_debug_movement_update(void *player_value);
 void player_detect_ledge(sint32 x, sint32 y, sint32 z, sint32 width, sint32 height);
 void player_env_damage_update(PLAYER *player);
-void player_hit_flash_update(PLAYER *player);
+void player_hit_flash_update(void *player_value);
 void player_inventory_remove_empty(void *raw_slot);
 void player_ledge_control_update(void *raw_player);
 void player_prone_control_update(void *raw_player);
@@ -289,7 +289,7 @@ void player_projectile_impact_update(void *raw_object, sint32 old_x, sint32 old_
 void player_throw_explosive(PLAYER *player);
 GDB_CALL COLLISION *player_special_projectile_create(sint32 wanted_angle);
 SPRITE *player_projectile_create(PLAYER *player, sint16 fire_mode);
-void player_mission_complete_update(PLAYER *player);
+void player_mission_complete_update(void *player_value);
 void player_ammunition_regenerate(void);
 /* END GENERATED MODULE API */
 

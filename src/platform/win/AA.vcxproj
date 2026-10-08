@@ -70,9 +70,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>XPORT_NATIVE;_CRT_SECURE_NO_WARNINGS;_DEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XPORT_NATIVE;_WINSOCKAPI_;_CRT_SECURE_NO_WARNINGS;_DEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -95,9 +96,10 @@
   <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
       <DisableSpecificWarnings>4100;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>XPORT_NATIVE;_CRT_SECURE_NO_WARNINGS;NDEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>XPORT_NATIVE;_WINSOCKAPI_;_CRT_SECURE_NO_WARNINGS;NDEBUG;WND_TITLE=&quot;Agent Armstrong (xport)&quot;;WND_WIDTH=960;WND_HEIGHT=768;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -136,12 +138,9 @@
       <Optimization Condition="'$(Configuration)'=='Debug'">MaxSpeed</Optimization>
       <BasicRuntimeChecks Condition="'$(Configuration)'=='Debug'">Default</BasicRuntimeChecks>
     </ClCompile>
-    <ClCompile Include="..\..\..\..\xport\src\psx_pad.c">
-      <ObjectFileName>$(IntDir)xport_psx_pad.obj</ObjectFileName>
-    </ClCompile>
-    <ClCompile Include="..\..\..\..\xport\src\psx_spu.c">
+<ClCompile Include="..\..\..\..\xport\src\psx_spu.c">
       <ObjectFileName>$(IntDir)xport_psx_spu.obj</ObjectFileName>
-    </ClCompile>
+    </ClCompile><ClCompile Include="..\..\..\..\xport\src\xport_trace.c" />
     <ClCompile Include="..\..\game_sound.c" />
     <ClCompile Include="..\..\animation.c" />
     <ClCompile Include="..\..\industry.c" />
@@ -202,7 +201,7 @@
     <ClInclude Include="..\..\..\..\xport\src\xport.h" />
     <ClInclude Include="..\..\..\..\xport\src\psx.h" />
     <ClInclude Include="..\..\..\..\xport\src\psx_gpu.h" />
-    <ClInclude Include="..\..\..\..\xport\src\psx_pad.h" />
+    
     <ClInclude Include="..\..\..\..\xport\src\psx_spu.h" />
     <ClInclude Include="..\..\scuba_player.h" />
     <ClInclude Include="..\..\game_runtime.h" />

@@ -20,7 +20,7 @@ typedef char SoundVolumePair_size_04[sizeof(SOUND_VOLUME_PAIR) == 0x04 ? 1 : -1]
 
 /* BEGIN GENERATED MODULE API */
 SOUND_VOLUME_PAIR *sound_spatial_volume_calculate(sint32 type, sint32 x, sint32 y, sint32 z);
-SpuVoiceAttr *sound_voice_spatial_volume_update(SOUND_VOLUME_PAIR *volume, sint32 handle);
+SpuVoiceAttr *sound_voice_spatial_volume_update(const void *volume_value, sint32 handle);
 sint32 sound_play_nonpositional(sint32 id, sint32 note_delta, sint32 volume);
 uint16 sound_play_positional(sint32 id, sint32 note_delta, sint32 type, sint32 x, sint32 y, sint32 z);
 void sound_bank_load(sint32 bank_index, sint32 first_sound);

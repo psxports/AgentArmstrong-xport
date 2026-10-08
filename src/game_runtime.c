@@ -309,7 +309,7 @@ static void dump_ot_trace_once(void)
     if (done || !enabled || !*enabled || frame_number < 30 || !g_current_render_frame)
         return;
     done = 1;
-    f = fopen("ot_trace.csv", "w");
+    f = xport_fopen("ot_trace.csv", "w");
     if (!f)
         return;
     fprintf(f, "submission,bucket,code,kind,world_x,world_y,world_z,x,y,u,v\n");
@@ -355,7 +355,7 @@ static void trace_sprite_packet(const uint8 *p, const FrameObjectPartial *o)
     sint32 ready = !getenv("OA_LOGICAL_OT_REFERENCE_CAMERA") || (g_camera_world_x == 0xc8000 && g_camera_world_y == (sint32)0xffff9100 && g_camera_world_z == 0x68000);
     if (!getenv("OA_SPRITE_PACKET_TRACE") || !ready || count >= 512 || !o)
         return;
-    f = fopen("sprite_packets_port.log", count ? "a" : "w");
+    f = xport_fopen("sprite_packets_port.log", count ? "a" : "w");
     if (!f)
         return;
     fprintf(f, "PACKET %d tick=%u bucket=%d cell=%d,%d rawlight=%u maplight=%u baseline=%d fade=%d xyz=%08x,%08x,%08x split=%d,%d light=%u,%u,%u code=%02x\n", count, g_frame_counter, (sint32)o->ot_bucket, trace_cell_x, trace_cell_z, trace_cell ? (uint32)trace_cell->field_05 : 0, trace_cell && g_map_cell_light_values ? (uint32)g_map_cell_light_values[trace_cell_z * g_map_width_cells + trace_cell_x] : 0, g_depth_lighting_bias, g_scene_brightness_bias, (uint32)o->world_x, (uint32)o->world_y, (uint32)o->world_z, (sint32)o->x_subcell_offset, (sint32)o->draw_env_height, (uint32)p[4], (uint32)p[5], (uint32)p[6], (uint32)p[7]);
@@ -376,7 +376,7 @@ void psx_ot_trace_begin(void)
     }
     if (logical_ot_done || frame_number < 30 || !e || !*e)
         return;
-    logical_ot_trace = fopen("ot_order_port.log", "w");
+    logical_ot_trace = xport_fopen("ot_order_port.log", "w");
     logical_ot_seq = 0;
     if (logical_ot_trace)
         fprintf(logical_ot_trace, "FRAME camera=%#x,%#x,%#x\n", g_camera_world_x, g_camera_world_y, g_camera_world_z);
@@ -1400,7 +1400,7 @@ sint32 psx_load_hq_textures(const uint8 *texinfo, uint32 texinfo_size)
         return 0;
     if (getenv("OA_VRAM_LAYOUT_TRACE"))
     {
-        trace = fopen("vram_layout_port.csv", "w");
+        trace = xport_fopen("vram_layout_port.csv", "w");
         if (trace)
             fprintf(trace, "material,tx,resource,u,v,tpage,page_x,page_y,mode,clut\n");
     }
@@ -1824,7 +1824,7 @@ static void trace_model_packet(const uint8 *p)
     sint32 ready = !getenv("OA_LOGICAL_OT_REFERENCE_CAMERA") || (g_camera_world_x == 0xc8000 && g_camera_world_y == (sint32)0xffff9100 && g_camera_world_z == 0x68000);
     if (!getenv("OA_MODEL_PACKET_TRACE") || !ready || count >= 128)
         return;
-    f = fopen("model_packets_port.log", count ? "a" : "w");
+    f = xport_fopen("model_packets_port.log", count ? "a" : "w");
     if (!f)
         return;
     fprintf(f, "PACKET %d bucket=%d code=%#x camera=%#x,%#x,%#x model=%d xyz=%#x,%#x,%#x rot=%#x,%#x,%#x\n", count, prim_ot_bucket, p[7], g_camera_world_x, g_camera_world_y, g_camera_world_z, packet_model_id, packet_model_x, packet_model_y, packet_model_z, packet_model_ry, packet_model_rx, packet_model_rz);
@@ -1842,7 +1842,7 @@ static void trace_hierarchy_packet(const POLY_FT3 *packet)
     sint32 index;
     if (!hierarchy_packet_trace_active || !getenv("OA_HIERARCHY_PACKET_TRACE"))
         return;
-    file = fopen("hierarchy_packets_port.log", count ? "a" : "w");
+    file = xport_fopen("hierarchy_packets_port.log", count ? "a" : "w");
     if (file == 0)
         return;
     fprintf(file, "HIER_PACKET %d maxz=%d bucket=%d code=%#x clut=%#x tpage=%#x model=%d frame=%u\n", count, prim_world_depth, prim_ot_bucket, packet->code, packet->clut, packet->tpage, g_current_model_id, g_frame_counter);
@@ -2058,7 +2058,7 @@ void psx_submit_frame_object(FrameObjectPartial *o, sint32 row_bucket)
             static sint32 traced;
             if (traced < 8)
             {
-                FILE *f = fopen("light_trace_port.log", traced ? "a" : "w");
+                FILE *f = xport_fopen("light_trace_port.log", traced ? "a" : "w");
                 if (f)
                 {
                     fprintf(f, "xyz=%#x,%#x,%#x sub=%d width=%d baseline=%d light=%d\n", o->world_x, o->world_y, o->world_z, o->x_subcell_offset, o->draw_env_height, g_depth_lighting_bias, cell_sprite_light);
@@ -2150,7 +2150,7 @@ static void log_floor_tile(const MAP_FLOOR_CELL *cell, const RV *q, const MapTex
     if (seen & (1u << bit))
         return;
     seen |= 1u << bit;
-    f = fopen("floor_tiles_port.csv", "a");
+    f = xport_fopen("floor_tiles_port.csv", "a");
     if (!f)
         return;
     if (bit == 0)
@@ -2274,7 +2274,7 @@ void psx_draw_floor_tile(sint32 a, sint32 b, sint32 c, sint32 d, sint32 e, sint3
      * affect packet creation or submission. */
             if (reference_ready && floor_packet_count < 96 && floor_packet_tick_count < 45)
             {
-                FILE *trace = fopen(strcmp(trace_name, "1") == 0 ? "floor_packets_port.log" : trace_name, floor_packet_count ? "a" : "w");
+                FILE *trace = xport_fopen(strcmp(trace_name, "1") == 0 ? "floor_packets_port.log" : trace_name, floor_packet_count ? "a" : "w");
                 if (trace)
                 {
                     uint32 *words = (uint32 *)p;

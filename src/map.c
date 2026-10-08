@@ -238,7 +238,7 @@ static void trace_map_object(const char *phase, MAP_RUNTIME *object)
 
     if (getenv("OA_BREAKABLE_TRACE") == 0)
         return;
-    trace = fopen("breakable_objects_port.log", started ? "a" : "w");
+    trace = xport_fopen("breakable_objects_port.log", started ? "a" : "w");
     if (trace)
     {
         fprintf(trace, "%s %d ptr=%p type=%d xyz=%08x,%08x,%08x half=%08x mask=%08x hp=%d box=%08x,%08x,%08x size=%08x,%08x,%08x\n", phase, sequence, object, (sint32)object->collision.object_type, (uint32)object->collision.x, (uint32)object->collision.y, (uint32)object->collision.z, (uint32)object->y_offset, (uint32)object->collision.receives_mask, (sint32)object->health, (uint32)object->collision.box_x, (uint32)object->collision.box_y, (uint32)object->collision.box_z, (uint32)object->collision.width, (uint32)object->collision.height, (uint32)object->collision.depth);
@@ -566,8 +566,9 @@ void map_grid_initialize(void)
 }
 
 /* Original: FUN_80095190. */
-void map_light_stamp_apply(sint32 world_x, sint32 world_z, sint16 clear, const MAP_STAMP *stamp)
+void map_light_stamp_apply(sint32 world_x, sint32 world_z, sint16 clear, const void *stamp_value)
 {
+    const MAP_STAMP *stamp = (const MAP_STAMP *)stamp_value;
     sint32 x, z;
     sint32 base_x, base_z;
     sint32 random_offset;

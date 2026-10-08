@@ -177,7 +177,7 @@ void bio_goo_create(EFFECT *e)
     if (g_stage_index == 31 && getenv("OA_STAGE31_TRACE"))
     {
         uint8 before = g_objective_counts[15];
-        FILE *f = fopen("../status/bio-goo-native.log", "w");
+        FILE *f = xport_fopen("../status/bio-goo-native.log", "w");
         if (f)
         {
             fprintf(f, "BIO_GOO_NATIVE_CTOR xyz=%d,%d,%d health=%d model=%d floor=%d speed=%d flags=%d\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->node.model_id, o->floor_y, o->velocity_y, o->collision.receives_mask);
@@ -187,14 +187,14 @@ void bio_goo_create(EFFECT *e)
         o->velocity_y = 0x600;
         o->bounce_ticks = 0;
         bio_goo_update(o);
-        f = fopen("../status/bio-goo-native.log", "a");
+        f = xport_fopen("../status/bio-goo-native.log", "a");
         if (f)
         {
             fprintf(f, "BIO_GOO_NATIVE_BOUNCE y=%d speed=%d timer=%u\n", o->collision.y, o->velocity_y, (unsigned)o->bounce_ticks);
             fclose(f);
         }
         bio_goo_damage(&o->collision, &o->collision);
-        f = fopen("../status/bio-goo-native.log", "a");
+        f = xport_fopen("../status/bio-goo-native.log", "a");
         if (f)
         {
             fprintf(f, "BIO_GOO_NATIVE_DAMAGE armed=%u speed=%d timer=%u flags=%d\n", (unsigned)o->destruction_armed, o->velocity_y, (unsigned)o->bounce_ticks, o->collision.receives_mask);
@@ -202,7 +202,7 @@ void bio_goo_create(EFFECT *e)
         }
         o->collision.y = o->floor_y + 1;
         bio_goo_update(o);
-        f = fopen("../status/bio-goo-native.log", "a");
+        f = xport_fopen("../status/bio-goo-native.log", "a");
         if (f)
         {
             fprintf(f, "BIO_GOO_NATIVE_DEATH counter15_before=%u counter15_after=%u\n", (unsigned)before, (unsigned)g_objective_counts[15]);
@@ -301,7 +301,7 @@ void robot_press_create(EFFECT *e)
         EFFECT *link = 0;
         sint32 nx = 0, nz = 0, lx = 0;
         uint8 before = g_objective_counts[17];
-        FILE *f = fopen("../status/robot-press-native.log", "w");
+        FILE *f = xport_fopen("../status/robot-press-native.log", "w");
         if (f)
         {
             fprintf(f, "ROBOT_PRESS_NATIVE_CTOR xyz=%d,%d,%d health=%d model=%d child_offset=%d flags=%d\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->nodes[1].model_id, o->nodes[1].translation_x, o->collision.receives_mask);
@@ -315,7 +315,7 @@ void robot_press_create(EFFECT *e)
             near->z = o->collision.z;
         }
         robot_press_update(o);
-        f = fopen("../status/robot-press-native.log", "a");
+        f = xport_fopen("../status/robot-press-native.log", "a");
         if (f)
         {
             fprintf(f, "ROBOT_PRESS_NATIVE_UPDATE angle=%d timer=%u active=%d target=%u\n", o->nodes[0].rotation_y, (unsigned)o->activation_ticks, o->active, (unsigned)o->target_rotation);
@@ -334,7 +334,7 @@ void robot_press_create(EFFECT *e)
             link->x = o->collision.x;
         }
         robot_press_damage(&o->collision, &o->collision);
-        f = fopen("../status/robot-press-native.log", "a");
+        f = xport_fopen("../status/robot-press-native.log", "a");
         if (f)
         {
             fprintf(f, "ROBOT_PRESS_NATIVE_DEATH link_cleared=%d counter17_before=%u counter17_after=%u\n", link ? link->type : -1, (unsigned)before, (unsigned)g_objective_counts[17]);
@@ -408,7 +408,7 @@ void industry_gun_controller_create(EFFECT *effect)
         g_screen_half_width = 0xa0;
         trace_spawn = 0;
         industry_gun_controller_update(controller);
-        f = fopen("../status/the-pits-native.log", "w");
+        f = xport_fopen("../status/the-pits-native.log", "w");
         if (f && trace_spawn)
         {
             fprintf(f, "THE_PITS_NATIVE source=%d,%d,%d gate=%u cooldown=%d shot=%d,%d,%d vy=%d scale=%d,%d health=%d flags=%d\n", effect->x, effect->y, effect->z, (unsigned)gate, (sint16)effect->values[0], trace_spawn->collision.x, trace_spawn->collision.y, trace_spawn->collision.z, trace_spawn->velocity_y, trace_spawn->scale_x, trace_spawn->scale_y, trace_spawn->damage, trace_spawn->collision.receives_mask);

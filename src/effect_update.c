@@ -116,7 +116,7 @@ void jungle_animated_effect_update(EFFECT *effect)
 #ifdef XPORT_NATIVE
     if (getenv("OA_STAGE22_TRACE"))
     {
-        FILE *file = fopen("../status/river-action-native.log", "a");
+        FILE *file = xport_fopen("../status/river-action-native.log", "a");
         if (file)
         {
             fprintf(file, "RIVER_NATIVE_7A value=%d tick=%d frame_id=%d xyz=%d,%d,%d\n", (sint16)effect->values[0], (sint16)effect->values[1], 0x2e800 + old_frame, effect->x, effect->y, effect->z);
@@ -536,7 +536,7 @@ void effects_update_visible(void)
             g_scene_far_z = 0x7fffffff;
             if (tug_trace_frame == 0)
             {
-                file = fopen("../status/tug-o-war-native.log", "a");
+                file = xport_fopen("../status/tug-o-war-native.log", "a");
                 if (file)
                 {
                     fprintf(file, "TUG_NATIVE_READY stage=%d effects=%d index=17 source_type_post=%u handler=%u xyz=%d,%d,%d\n", g_stage_index, g_effect_count, focus->type, focus->handler, focus->x, focus->y, focus->z);
@@ -596,7 +596,7 @@ void effects_update_visible(void)
         if (trace && *trace && g_stage_index == 22 && g_effect_count == 211 && stage22_trace_frame == 0)
         {
             EFFECT *focus = &g_effects[177];
-            FILE *file = fopen("../status/river-action-native.log", "w");
+            FILE *file = xport_fopen("../status/river-action-native.log", "w");
             if (file)
             {
                 fprintf(file, "RIVER_NATIVE_READY stage=22 effects=%d index=177 type=%u handler=%u xyz=%d,%d,%d forced_handler_entry=1\n", g_effect_count, focus->type, focus->handler, focus->x, focus->y, focus->z);
@@ -629,7 +629,7 @@ void effects_update_visible(void)
         if (trace && *trace && g_stage_index == 24 && g_effect_count == 92 && stage24_trace_frame == 0)
         {
             EFFECT *low = &g_effects[0], *high = &g_effects[56];
-            FILE *file = fopen("../status/jungle-falls-native.log", "w");
+            FILE *file = xport_fopen("../status/jungle-falls-native.log", "w");
             camera_depth_limit_set(low);
             camera_depth_limit_set(high);
             if (file)
@@ -762,7 +762,7 @@ void effects_update_visible(void)
         const char *trace = getenv("OA_SUB_BASE_TRACE");
         if (trace && *trace && !trace_header)
         {
-            FILE *file = fopen("../status/sub-base-native-focus.log", "w");
+            FILE *file = xport_fopen("../status/sub-base-native-focus.log", "w");
             if (file)
             {
                 fprintf(file, "stage=%d effects=%d\n", g_stage_index, g_effect_count);
@@ -780,7 +780,7 @@ void effects_update_visible(void)
             g_camera_world_z = focus->z - 0x4000;
             if ((trace_frame % 30) == 0)
             {
-                FILE *file = fopen("../status/sub-base-native-focus.log", trace_frame ? "a" : "w");
+                FILE *file = xport_fopen("../status/sub-base-native-focus.log", trace_frame ? "a" : "w");
                 if (file)
                 {
                     fprintf(file, "frame=%d index=%d type=%u handler=%u xyz=%d,%d,%d\n", trace_frame, focus_indices[segment], focus->type, focus->handler, focus->x, focus->y, focus->z);

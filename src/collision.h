@@ -96,8 +96,8 @@ typedef char FlashableObject_ticks_at_7a[offsetof(FLASHABLE, flash_clut_ticks) =
 #endif
 
 /* BEGIN GENERATED MODULE API */
-GDB_CALL void collision_box_set(COLLISION *object, sint32 width, sint32 height, sint32 depth);
-sint16 object_damage_apply(FLASHABLE *target, FLASHABLE *source);
+GDB_CALL void collision_box_set(void *object_value, sint32 width, sint32 height, sint32 depth);
+sint16 object_damage_apply(void *target_value, void *source_value);
 void object_collisions_dispatch(void);
 /* END GENERATED MODULE API */
 

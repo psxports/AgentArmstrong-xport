@@ -143,8 +143,9 @@ typedef char AirshipLift_enabled_at_be[offsetof(AIRSHIP_LIFT, enabled) == 0xbe ?
 /* Exact resident helper 0x800AD8A8..0x800AD9DC.  The four selected hierarchy
  * nodes define a dynamic collision box around the visible airship body. */
 /* Original: FUN_800AD8A8. */
-void hierarchy_collision_box_update(COLLISION *object, MODEL_NODE *first_node, sint32 count)
+void hierarchy_collision_box_update(void *object_value, MODEL_NODE *first_node, sint32 count)
 {
+    COLLISION *object = (COLLISION *)object_value;
     MODEL_NODE *node = first_node;
     sint32 n;
     sint32 min_x = node->world_x, min_y = node->world_y, min_z = node->world_z;
@@ -178,7 +179,7 @@ void explosive_projectile_trail_update(PROJECTILE *projectile)
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
         {
-            FILE *file = fopen("../status/airfield-native.log", "a");
+            FILE *file = xport_fopen("../status/airfield-native.log", "a");
             if (file)
             {
                 fprintf(file, "AIRFIELD_NATIVE_TRAIL tick=%u\n", g_frame_counter);
@@ -207,7 +208,7 @@ void explosive_projectile_impact(PROJECTILE *projectile)
         { \
             if (airfield_trace && *airfield_trace) \
             { \
-                FILE *file = fopen("../status/airfield-native.log", "a"); \
+                FILE *file = xport_fopen("../status/airfield-native.log", "a"); \
                 if (file) \
                 { \
                     fprintf(file, "AIRFIELD_NATIVE_IMPACT_STEP %s\n", label); \
@@ -223,7 +224,7 @@ void explosive_projectile_impact(PROJECTILE *projectile)
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
         {
-            FILE *file = fopen("../status/airfield-native.log", "a");
+            FILE *file = xport_fopen("../status/airfield-native.log", "a");
             if (file)
             {
                 fprintf(file, "AIRFIELD_NATIVE_IMPACT xyz=%d,%d,%d\n", projectile->collision.x, projectile->collision.y, projectile->collision.z);

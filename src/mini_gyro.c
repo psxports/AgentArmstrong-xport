@@ -101,7 +101,7 @@ void mini_gyro_update(MINI_GYRO *object)
         static sint32 seen;
         if (!seen && getenv("OA_STAGE21_TRACE") && object->collision.object_type == 117)
         {
-            FILE *file = fopen("../status/take-a-bath-native.log", "a");
+            FILE *file = xport_fopen("../status/take-a-bath-native.log", "a");
             if (file)
             {
                 fprintf(file, "BATH_NATIVE_UPDATE type=117 xyz=%d,%d,%d health=%d\n", object->collision.x, object->collision.y, object->collision.z, object->health);
@@ -176,7 +176,7 @@ void mini_gyro_create(EFFECT *effect)
     if (getenv("OA_STAGE21_TRACE"))
     {
         static sint32 count;
-        FILE *file = fopen("../status/take-a-bath-native.log", count ? "a" : "w");
+        FILE *file = xport_fopen("../status/take-a-bath-native.log", count ? "a" : "w");
         if (file)
         {
             fprintf(file, "BATH_NATIVE_CTOR n=%d type=%d xyz=%d,%d,%d health=%d damage=800acb84 update=800ad6c0\n", count + 1, object->collision.object_type, object->collision.x, object->collision.y, object->collision.z, object->health);

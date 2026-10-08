@@ -319,7 +319,7 @@ void world_sprite_update(SPRITE *object)
     }
     else if (object->render_kind == 1)
     {
-        render_world_sprite_immediate(frame, object->collision.x, object->collision.y, object->collision.z, object->velocity_x, object->scale_x, object->scale_y, (sint32)object->collision.prim, 0, 0, 0, object->rotation_x);
+        render_world_sprite_immediate(frame, object->collision.x, object->collision.y, object->collision.z, object->velocity_x, object->scale_x, object->scale_y, (POLY_FT4 *)(intptr)object->collision.prim, 0, 0, 0, object->rotation_x);
     }
     else if (object->render_kind == 2)
     {

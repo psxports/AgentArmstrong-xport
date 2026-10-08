@@ -74,6 +74,21 @@ GDB_CALL void fatal_error(const char *message)
     } while (buttons != 0);
 }
 
+/* Apply host CD input gain */
+void music_volume_apply(sint32 volume)
+{
+    SpuCommonAttr attr;
+    if (volume < 0)
+        volume = 0;
+    if (volume > 127)
+        volume = 127;
+    memset(&attr, 0, sizeof(attr));
+    attr.mask = SPU_COMMON_CDVOLL | SPU_COMMON_CDVOLR;
+    attr.cd.volume.left = (sint16)(volume * 258);
+    attr.cd.volume.right = (sint16)(volume * 258);
+    SpuSetCommonAttr(&attr);
+}
+
 /* Original: FUN_800A99F0. */
 GDB_CALL void music_track_select(sint32 id, sint32 unused)
 {
@@ -83,7 +98,7 @@ GDB_CALL void music_track_select(sint32 id, sint32 unused)
     g_current_music_track = id;
     volume = ((sint32)volume_table[id] * g_music_volume_setting) / 0x80;
     track = id + g_cd_audio_track_offset;
-    SsSetSerialVol(SS_SERIAL_A, (sint16)volume, (sint16)volume);
+    music_volume_apply(volume);
     CdPlay(1, &track, 0);
 }
 

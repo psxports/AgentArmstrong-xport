@@ -43,14 +43,14 @@ static FILE *open_data_file(const char *path, const char *mode)
     if (configured_root != NULL && strlen(configured_root) + strlen(relative) + 7 < sizeof(candidate))
     {
         sprintf(candidate, "%s/DATA/%s", configured_root, relative);
-        file = fopen(candidate, mode);
+        file = xport_fopen(candidate, mode);
         if (file != NULL)
             return file;
     }
     if (strlen(relative) + 6 >= sizeof(candidate))
         return NULL;
     sprintf(candidate, "DATA/%s", relative);
-    return fopen(candidate, mode);
+    return xport_fopen(candidate, mode);
 }
 
 static void *load_open_file(FILE *file, sint32 *size_out)
@@ -137,7 +137,7 @@ sint32 app_file_read(const char *path, void *destination, sint32 capacity, sint3
 
 sint32 app_file_write(const char *path, const void *data, sint32 size)
 {
-    FILE *file = fopen(path, "wb");
+    FILE *file = xport_fopen(path, "wb");
     sint32 result;
 
     if (file == NULL || size < 0)

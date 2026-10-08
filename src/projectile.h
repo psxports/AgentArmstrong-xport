@@ -44,6 +44,7 @@ typedef char LineProjectile_size_c4[sizeof(PROJECTILE) == 0xc4 ? 1 : -1];
 /* BEGIN GENERATED MODULE API */
 SPRITE *expl_flash_create(sint32 x, sint32 y, sint32 z);
 SPRITE *surface_impact_create(sint32 x, sint32 y, sint32 z, const sint32 *animation);
+SPRITE *thrown_explosive_create(sint32 x, sint32 y, sint32 z, const sint32 *animation);
 SPRITE *world_sprite_create(sint32 x, sint32 y, sint32 z, const sint32 *animation);
 sint16 swept_collision_test(sint32 old_x, sint32 old_y, sint32 old_z, sint32 *new_x, sint32 *new_y, sint32 *new_z);
 sint32 fixed_angle_from_vector(sint32 x, sint32 z);
@@ -51,6 +52,7 @@ sint32 world_object_is_visible(sint32 x, sint32 y, sint32 z, sint32 diameter);
 void homing_projectile_steer(SPRITE *object);
 void projectile_surface_impact_emit(sint32 x, sint32 y, sint32 z);
 void projectile_trail_emit(SPRITE *object);
+void world_sprite_destroy(SPRITE *object);
 void world_sprite_update(SPRITE *object);
 /* END GENERATED MODULE API */
 

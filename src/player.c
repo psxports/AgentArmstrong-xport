@@ -376,8 +376,9 @@ static void draw_player_frame(PLAYER *player, uint32 frame_id)
 }
 
 /* Direct decompilation of FUN_80096B28. */
-void player_hit_flash_update(PLAYER *player)
+void player_hit_flash_update(void *player_value)
 {
+    PLAYER *player = (PLAYER *)player_value;
     if (player->flash_clut_ticks != 0)
     {
         player->flash_clut_ticks = (sint16)(player->flash_clut_ticks - 1);
@@ -395,8 +396,9 @@ void player_spatial_sound_update(PLAYER *player)
 }
 
 /* Direct FUN_8009EA94 translation (development-controller movement). */
-void player_debug_movement_update(PLAYER *player)
+void player_debug_movement_update(void *player_value)
 {
+    PLAYER *player = (PLAYER *)player_value;
     uint16 buttons = (uint16)(g_held_buttons >> 16);
     sint32 old_x = player->x, old_y = player->y, old_z = player->z;
     if (buttons & 0x8000)
@@ -1507,7 +1509,7 @@ GDB_CALL sint16 menu_run(void *raw_entries, sint32 x, sint32 y)
                 if (volume < 0)
                     volume += 0x7f;
                 volume >>= 7;
-                SsSetSerialVol(SS_SERIAL_A, (sint16)volume, (sint16)volume);
+                music_volume_apply(volume);
             }
         }
         if (selected->result == 'L')
@@ -3285,7 +3287,7 @@ void player_action_effect_create(EFFECT *effect)
 #ifdef XPORT_NATIVE
     if (g_stage_index == 29 && getenv("OA_STAGE29_TRACE") && (source_type == 0x89 || source_type == 0x8c))
     {
-        FILE *f = fopen("../status/chemical-vats-native.log", source_type == 0x89 ? "w" : "a");
+        FILE *f = xport_fopen("../status/chemical-vats-native.log", source_type == 0x89 ? "w" : "a");
         if (f)
         {
             fprintf(f, "CHEMICAL_VATS_NATIVE source_type=%d xyz=%d,%d,%d object_type=%d c8=%d source_cleared=%d\n", source_type, object->collision.x, object->collision.y, object->collision.z, object->collision.object_type, object->item_type, effect->type);
@@ -3557,8 +3559,9 @@ SPRITE *player_projectile_create(PLAYER *player, sint16 fire_mode)
 
 /* 0x800AB99C..0x800ABC4C. */
 /* Original: FUN_800AB99C. */
-void player_mission_complete_update(PLAYER *player)
+void player_mission_complete_update(void *player_value)
 {
+    PLAYER *player = (PLAYER *)player_value;
     char text[96], number[16];
     MissionRecord *record;
     sint32 completed, next_stage, result;

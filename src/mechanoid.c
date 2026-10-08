@@ -40,7 +40,7 @@ static void mechanoid_trace(const char *event, MECHANOID_ACTOR *b)
     FILE *f;
     if (!name || !b)
         return;
-    f = fopen(strcmp(name, "1") == 0 ? "mechanoid_port.csv" : name, strcmp(event, "construct") == 0 ? "w" : "a");
+    f = xport_fopen(strcmp(name, "1") == 0 ? "mechanoid_port.csv" : name, strcmp(event, "construct") == 0 ? "w" : "a");
     if (!f)
         return;
     if (strcmp(event, "construct") == 0)

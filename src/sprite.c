@@ -58,7 +58,7 @@ static void upload_dynamic_frame(VRAM_SPRITE *d, uint8 *frame, sint32 width_minu
         static sint32 count;
         if (count < 128)
         {
-            FILE *f = fopen("player_upload_port.log", count ? "a" : "w");
+            FILE *f = xport_fopen("player_upload_port.log", count ? "a" : "w");
             if (f)
             {
                 fprintf(f, "UPLOAD %d resource=%#x rect=%d,%d,%d,%d mode=%u frame=%ux%u\n", count, g_current_sprite_upload_resource, rect.x, rect.y, rect.w, rect.h, (uint32)d->pixel_mode, (uint32)frame[0], (uint32)frame[1]);
@@ -120,7 +120,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
         static sint32 count;
         if (count < 256)
         {
-            FILE *f = fopen("sprite_calls_port.log", count ? "a" : "w");
+            FILE *f = xport_fopen("sprite_calls_port.log", count ? "a" : "w");
             if (f)
             {
                 fprintf(f, "CALL %d tick=%u resource=%08x xyz=%08x,%08x,%08x flip=%08x scale=%08x,%08x prim=%08x bucket=%d split=%d desc=%08x rot=%08x\n", count, g_frame_counter, resource, (uint32)x, (uint32)y, (uint32)z, (uint32)flip_or_velocity, (uint32)scale_x, (uint32)scale_y, (uint32)(uintptr_t)p, (sint32)ot_bucket, split_mode, (uint32)(uintptr_t)d, (uint32)rotation);
@@ -305,7 +305,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
     g_next_frame_object = next;
     if (getenv("OA_SPRITE_CALL_TRACE"))
     {
-        FILE *f = fopen("sprite_calls_port.log", "a");
+        FILE *f = xport_fopen("sprite_calls_port.log", "a");
         if (f)
         {
             fprintf(f, "EMIT tick=%u resource=%08x records=%d\n", g_frame_counter, resource, (sint32)(next - record));
@@ -343,7 +343,7 @@ GDB_CALL SPRT *render_screen_sprite(sint16 x, sint16 y, uint32 resource, sint16 
         static sint32 trace_count;
         if (trace_count < 512)
         {
-            FILE *trace = fopen("screen_sprites_port.log", trace_count ? "a" : "w");
+            FILE *trace = xport_fopen("screen_sprites_port.log", trace_count ? "a" : "w");
             if (trace)
             {
                 fprintf(trace, "%d,resource=%#x,x=%d,y=%d,u=%u,v=%u,clut=%u,w=%u,h=%u,tpage=%u,ot=%d\n", trace_count, resource, (sint32)sprite->x0, (sint32)sprite->y0, (uint32)sprite->u0, (uint32)sprite->v0, (uint32)sprite->clut, (uint32)sprite->w, (uint32)sprite->h, (uint32)d->tpage, (sint32)ot_bucket);
@@ -501,7 +501,7 @@ sint32 sprite_resource_dump_audit(const char *path)
     sint32 index, count = (sint32)(descriptor_next - descriptor_pool);
     if (path == 0)
         return 0;
-    file = fopen(path, "w");
+    file = xport_fopen(path, "w");
     if (file == 0)
         return 0;
     fprintf(file, "index,resource,u0,u1,v0,v1,tpage,page_x,page_y,mode,clut,pivot_x,pivot_y,width_minus_one,height\n");
@@ -534,7 +534,7 @@ void sprite_upload_pixels(void *raw_descriptor, uint8 *pixels, sint32 mode)
     if (getenv("OA_PLAYER_UPLOAD_TRACE") && (g_current_sprite_upload_resource >> 10) == 0x30)
     {
         static sint32 trace_count;
-        FILE *trace = fopen("player_upload_port.log", trace_count ? "a" : "w");
+        FILE *trace = xport_fopen("player_upload_port.log", trace_count ? "a" : "w");
         if (trace)
         {
             fprintf(trace, "UPLOAD %d resource=%#x rect=%d,%d,%d,%d mode=%d tpage=%#x clut=%#x uv=%u,%u,%u,%u\n", trace_count, g_current_sprite_upload_resource, rect.x, rect.y, rect.w, rect.h, mode, d->tpage, d->clut, d->u0, d->u1, d->v0, d->v1);
@@ -638,7 +638,7 @@ GDB_CALL uint32 sprite_clut_upload(uint32 resource_id, sint32 unused_2, sint32 u
     if (getenv("OA_CLUT_TRACE"))
     {
         static sint32 clut_trace_count;
-        FILE *trace = fopen("clut_upload_port.log", clut_trace_count ? "a" : "w");
+        FILE *trace = xport_fopen("clut_upload_port.log", clut_trace_count ? "a" : "w");
         if (trace)
         {
             fprintf(trace, "CLUT %d resource=%#x rect=%d,%d,%d,1 semi=%d\n", clut_trace_count, resource_id, rect.x, rect.y, count, semi_transparent);

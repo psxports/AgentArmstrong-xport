@@ -457,7 +457,7 @@ void hq_set_pending_transition(void)
     hq_pending_transition = 1;
     if (getenv("OA_MISSION_LAUNCH_TRACE") != 0)
     {
-        FILE *trace = fopen("mission_launch_port.log", "a");
+        FILE *trace = xport_fopen("mission_launch_port.log", "a");
         if (trace != 0)
         {
             fprintf(trace, "MISSION_ACCEPT selected=%d pending=%d\n", g_next_stage_index, hq_pending_transition);

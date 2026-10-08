@@ -232,7 +232,7 @@ static void scuba_trace(uint32 bit, const char *tag, void *raw)
     const char *stage19 = getenv("OA_STAGE19_TRACE");
     if ((scuba_trace_seen & bit) != 0 || (getenv("OA_SUB_BASE_TRACE") == 0 && !stage19))
         return;
-    file = fopen(stage19 ? "../status/stage19-native.log" : "../status/sub-base-native.log", scuba_trace_seen ? "a" : "w");
+    file = xport_fopen(stage19 ? "../status/stage19-native.log" : "../status/sub-base-native.log", scuba_trace_seen ? "a" : "w");
     if (file == 0)
         return;
     fprintf(file, "%s_NATIVE_%s tick=%u xyz=%d,%d,%d\n", stage19 ? "STAGE19" : "SUBBASE", tag, g_frame_counter, record->x, record->y, record->z);
@@ -385,7 +385,7 @@ static void scuba_ship_target_update(SCUBA_SHIP_TARGET *object)
         if (!seen && getenv("OA_STAGE20_TRACE"))
         {
             uint8 before = g_objective_counts[10];
-            FILE *file = fopen("../status/ship-wrecking-native.log", "a");
+            FILE *file = xport_fopen("../status/ship-wrecking-native.log", "a");
             if (file)
             {
                 fprintf(file, "SHIP_NATIVE_UPDATE xyz=%d,%d,%d health=%d\n", object->collision.x, object->collision.y, object->collision.z, object->health);
@@ -393,7 +393,7 @@ static void scuba_ship_target_update(SCUBA_SHIP_TARGET *object)
             }
             seen = 1;
             scuba_ship_target_damage(object, (FLASHABLE *)object);
-            file = fopen("../status/ship-wrecking-native.log", "a");
+            file = xport_fopen("../status/ship-wrecking-native.log", "a");
             if (file)
             {
                 fprintf(file, "SHIP_NATIVE_DAMAGE health=%d counter10_before=%u counter10_after=%u\n", object->health, before, g_objective_counts[10]);
@@ -432,7 +432,7 @@ void scuba_ship_target_create(EFFECT *effect)
     if (getenv("OA_STAGE20_TRACE"))
     {
         static sint32 count;
-        FILE *file = fopen("../status/ship-wrecking-native.log", count ? "a" : "w");
+        FILE *file = xport_fopen("../status/ship-wrecking-native.log", count ? "a" : "w");
         if (file)
         {
             fprintf(file, "SHIP_NATIVE_CTOR n=%d xyz=%d,%d,%d health=%d damage=800fee18 update=800fed94\n", count + 1, object->collision.x, object->collision.y, object->collision.z, object->health);
@@ -454,7 +454,7 @@ static void scuba_tug_target_update(SCUBA_TUG_TARGET *o)
         static sint32 seen;
         if (!seen && getenv("OA_TUG_TRACE"))
         {
-            FILE *file = fopen("../status/tug-o-war-native.log", "a");
+            FILE *file = xport_fopen("../status/tug-o-war-native.log", "a");
             if (file)
             {
                 fprintf(file, "TUG_NATIVE_UPDATE oscillation=%d step=%d xyz=%d,%d,%d\n", o->oscillation, o->oscillation_step, o->collision.x, o->collision.y, o->collision.z);
@@ -564,7 +564,7 @@ void scuba_tug_target_create(EFFECT *effect)
     if (getenv("OA_TUG_TRACE"))
     {
         static sint32 count;
-        FILE *file = fopen("../status/tug-o-war-native.log", count ? "a" : "w");
+        FILE *file = xport_fopen("../status/tug-o-war-native.log", count ? "a" : "w");
         if (file)
         {
             fprintf(file, "TUG_NATIVE_CTOR n=%d xyz=%d,%d,%d health=%d state=%d damage=800fddc8\n", count + 1, object->collision.x, object->collision.y, object->collision.z, object->health, object->sink_ticks);
@@ -1515,7 +1515,7 @@ static void scuba_mine_update(SCUBA_MINE *object)
         static sint32 seen;
         if (!seen && getenv("OA_STAGE19_TRACE"))
         {
-            FILE *file = fopen("../status/stage19-native.log", "a");
+            FILE *file = xport_fopen("../status/stage19-native.log", "a");
             if (file)
             {
                 fprintf(file, "STAGE19_NATIVE_UPDATE69_OBJECT xyz=%d,%d,%d health=%d damage=800fd960\n", object->collision.x, object->collision.y, object->collision.z, object->health);

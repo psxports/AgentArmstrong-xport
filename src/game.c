@@ -190,15 +190,14 @@ static void mission_launch_trace(const char *event)
     FILE *trace;
     if (getenv("OA_MISSION_LAUNCH_TRACE") == 0)
         return;
-    trace = fopen("mission_launch_port.log", "a");
+    trace = xport_fopen("mission_launch_port.log", "a");
     if (trace == 0)
         return;
     fprintf(trace, "%s stage=%d next=%d mode=%d env=%p player=%p\n", event, g_stage_index, g_next_stage_index, g_input_recording_mode, (void *)g_stage_env, g_player);
     fclose(trace);
 }
 
-// XPORT REVISION: 2026-09-24T16:58:21Z
-int xport_main(int argc, char **argv)
+static int game_main(int argc, char **argv)
 {
     uint32 packed;
     uint16 *env;
@@ -549,4 +548,10 @@ int xport_main(int argc, char **argv)
         }
     }
     return 0;
+}
+
+// XPORT REVISION: 2026-09-29T20:00:00Z
+void xport_main(void)
+{
+    xport_set_exit_code(game_main(xport_arg_count(), xport_arg_values()));
 }
