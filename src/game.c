@@ -203,6 +203,8 @@ static int game_main(int argc, char **argv)
     uint16 *env;
     uint16 tpage;
     sint32 musicId;
+    char *strPath;
+    sint32 strFrames;
 
     game_runtime_configure();
 
@@ -271,34 +273,32 @@ static int game_main(int argc, char **argv)
         g_model_render_frame = 0;
         g_vsync_count_total = 0;
 
-        /* STR playback is a platform boundary.  Keep the surrounding PAL
-         * game-side state flow, in particular the mandatory language/text
-         * loader at 0x80087FCC. */
         if (g_play_fmv != 0)
         {
-#if 0 /* Native STR decoder not implemented. */
-            if (g_fmvSeen == 0) {
+            if (g_fmvSeen == 0)
+            {
                 str_video_play("V\\VIE.STR;1", 0xF0, 0xF3, 0);
                 str_video_play("V\\KOTJ.STR;1", 0xB0, 0x85, 1);
             }
-#endif
             boot_language_text_load();
             if (g_fmvSeen == 0)
             {
-#if 0 /* Native STR decoder not implemented. */
-                if (g_language_id == 1) {
+                if (g_language_id == 1)
+                {
                     str_video_play("V\\SCEN.STR;1", 0xB0, 0x4FF, 1);
                 }
-                if (g_language_id == 3) {
+                if (g_language_id == 3)
+                {
                     str_video_play("V\\SCGR.STR;1", 0xB0, 0x4FF, 1);
                 }
-                if (g_language_id == 4) {
+                if (g_language_id == 4)
+                {
                     str_video_play("V\\SCSP.STR;1", 0xB0, 0x4FF, 1);
                 }
-                if (g_language_id == 2) {
+                if (g_language_id == 2)
+                {
                     str_video_play("V\\SCFR.STR;1", 0xB0, 0x4FF, 1);
                 }
-#endif
                 g_shared_scratch_value = 2;
             }
             else
@@ -306,38 +306,38 @@ static int game_main(int argc, char **argv)
                 g_shared_scratch_value = 3;
             }
             g_fmvSeen = 1;
-#if 0 /* Native STR decoder not implemented. */
-            if (g_titleStrToggle == 0) {
+            if (g_titleStrToggle == 0)
+            {
                 strPath = "V\\TITLE.STR;1";
                 strFrames = 0x88D;
-            } else {
+            }
+            else
+            {
                 strPath = "V\\T.STR;1";
                 strFrames = 0x2AC;
             }
             str_video_play(strPath, 0xB0, strFrames, g_shared_scratch_value);
-#endif
             g_play_fmv = 0;
             g_titleStrToggle ^= 1;
         }
 
         if (g_input_recording_mode == 0)
         {
-            /* STR playback disabled. Keep the non-video ending transition. */
-#if 0
-            if (g_next_stage_index == STAGE_AIR) {
+            if (g_next_stage_index == STAGE_AIR)
+            {
                 str_video_play("V\\AIR.STR;1", 0xB0, 0x55A, 3);
             }
-            if (g_next_stage_index == STAGE_R) {
+            if (g_next_stage_index == STAGE_R)
+            {
                 str_video_play("V\\R.STR;1", 0xB0, 0x635, 3);
             }
-            if ((g_next_stage_index == STAGE_SPECIAL || g_next_stage_index == STAGE_HUB) &&
-                g_stage_index == 0xD) {
+            if ((g_next_stage_index == STAGE_SPECIAL || g_next_stage_index == STAGE_HUB) && g_stage_index == 0xD)
+            {
                 str_video_play("V\\CITY.STR;1", 0xB0, 0x6B7, 3);
             }
-#endif
             if (g_next_stage_index == STAGE_ENDING)
             {
-                /* FUN_8008b7a8("V\\E.STR;1", 0xB0, 0x645, 0); */
+                str_video_play("V\\E.STR;1", 0xB0, 0x645, 0);
                 display_buffers_initialize();
                 SetDispMask(1);
                 sprite_vram_reset(g_sprite_vram_regions_game);

@@ -19,6 +19,7 @@
 #include "runtime_heap.h"
 #include "sprite.h"
 #include "stubs.h"
+#include "video.h"
 
 /* Types. */
 typedef struct
@@ -267,12 +268,17 @@ GDB_CALL void display_mask_set(sint32 mode)
     ++g_psx_display_mode_boundary_calls;
 }
 
-/* Original: FUN_8008B7A8.  The PAL body loads COMMON0/FMV.BIN and invokes its
- * STR player.  Native STR playback is an intentionally excluded platform
- * boundary, but retain an addressable no-op implementation for the recovered
- * ABI and debugger/call-database identity. */
-GDB_CALL void str_video_play(char *str_path, sint32 width, sint32 frames, sint32 mode)
+/* Original: FUN_8008B7A8. */
+GDB_CALL void str_video_play(char *str_path, sint32 height, sint32 frames, sint32 mode)
 {
+    video_play_str(str_path, height, frames);
+    if (mode == 2 || mode == 3)
+    {
+        display_buffers_initialize();
+        SetDispMask(1);
+        sprite_vram_reset(g_sprite_vram_regions_game);
+        font_sprite_initialize();
+    }
 }
 
 sint32 psx_cd_read_track_table(sint32 mode, void *workspace)

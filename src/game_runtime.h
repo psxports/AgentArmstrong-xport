@@ -24,7 +24,7 @@ GDB_CALL sint32 tim_image_upload(void *raw);
 GDB_CALL void display_mask_set(sint32 mode);
 GDB_CALL void end_frame_submit(sint32 mode);
 GDB_CALL void screen_overlay_draw(void);
-GDB_CALL void str_video_play(char *str_path, sint32 width, sint32 frames, sint32 mode);
+GDB_CALL void str_video_play(char *str_path, sint32 height, sint32 frames, sint32 mode);
 GDB_CALL void vram_clear(void);
 sint32 psx_cd_configure_driver(void);
 sint32 psx_cd_read_track_table(sint32 mode, void *workspace);

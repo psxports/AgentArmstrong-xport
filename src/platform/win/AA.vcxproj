@@ -140,7 +140,13 @@
     </ClCompile>
 <ClCompile Include="..\..\..\..\xport\src\psx_spu.c">
       <ObjectFileName>$(IntDir)xport_psx_spu.obj</ObjectFileName>
-    </ClCompile><ClCompile Include="..\..\..\..\xport\src\xport_trace.c" />
+    </ClCompile>
+    <ClCompile Include="..\..\..\..\xport\src\psx_xa.c" />
+    <ClCompile Include="..\..\..\..\xport\src\psx_mdec.c" />
+    <ClCompile Include="..\..\..\..\xport\src\psx_press.c" />
+    <ClCompile Include="..\..\..\..\xport\src\psx_vlc.c" />
+    <ClCompile Include="..\..\..\..\xport\src\psx_stream.c" />
+    <ClCompile Include="..\..\..\..\xport\src\xport_trace.c" />
     <ClCompile Include="..\..\game_sound.c" />
     <ClCompile Include="..\..\animation.c" />
     <ClCompile Include="..\..\industry.c" />
@@ -188,6 +194,7 @@
     <ClCompile Include="..\..\input.c" />
     <ClCompile Include="..\..\game_file.c" />
     <ClCompile Include="..\..\game_runtime.c" />
+    <ClCompile Include="..\..\video.c" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\animation.h" />
@@ -205,6 +212,7 @@
     <ClInclude Include="..\..\..\..\xport\src\psx_spu.h" />
     <ClInclude Include="..\..\scuba_player.h" />
     <ClInclude Include="..\..\game_runtime.h" />
+    <ClInclude Include="..\..\video.h" />
     <ClInclude Include="..\..\game_file.h" />
     <ClInclude Include="..\..\game_sound.h" />
     <ClInclude Include="..\..\input.h" />
