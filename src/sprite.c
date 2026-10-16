@@ -53,6 +53,7 @@ static void upload_dynamic_frame(VRAM_SPRITE *d, uint8 *frame, sint32 width_minu
         return;
     rect.y = (sint16)(d->page_y + d->v0);
     rect.h = (sint16)height;
+#if defined(_DEBUG)
     if (getenv("OA_PLAYER_UPLOAD_TRACE"))
     {
         static sint32 count;
@@ -67,6 +68,7 @@ static void upload_dynamic_frame(VRAM_SPRITE *d, uint8 *frame, sint32 width_minu
             count++;
         }
     }
+#endif
     LoadImagePSX(&rect, (uint32 *)(frame + 4));
 }
 
@@ -115,6 +117,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
     POLY_FT4 *p = prim;
     sint32 px, py, w, h, left, top, width_world, height_world, sort_left, split_width;
     sint32 depth, sx0, sx1, sy0, sy1;
+#if defined(_DEBUG)
     if (getenv("OA_SPRITE_CALL_TRACE"))
     {
         static sint32 count;
@@ -129,6 +132,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
             count++;
         }
     }
+#endif
     g_current_sprite_upload_resource = resource;
     if (record < g_frame_objects || record >= g_frame_objects + 80)
         return;
@@ -147,7 +151,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
     frame = animation_frame_resource(resource);
     if (!frame)
         return;
-    p->tpage = d->tpage;
+    p->p[1].attr = d->tpage;
     if (d->cached_resource == resource)
     {
         px = d->pivot_x;
@@ -209,23 +213,23 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
     record->draw_env_height = 0;
     record->model_plus_one = 0;
     record->drawn = 0;
-    p->clut = d->clut;
+    p->p[0].attr = d->clut;
     if (flip_or_velocity < 1)
     {
-        p->u0 = (uint8)d->u0;
-        p->u1 = (uint8)(d->u0 + w);
+        p->p[0].uv.u = (uint8)d->u0;
+        p->p[1].uv.u = (uint8)(d->u0 + w);
     }
     else
     {
-        p->u0 = (uint8)(d->u0 - w);
-        p->u1 = (uint8)d->u0;
+        p->p[0].uv.u = (uint8)(d->u0 - w);
+        p->p[1].uv.u = (uint8)d->u0;
     }
-    p->v0 = (uint8)d->v0;
-    p->u2 = p->u0;
-    p->v1 = (uint8)d->v0;
-    p->v2 = (uint8)(d->v0 + h - 1);
-    p->u3 = p->u1;
-    p->v3 = p->v2;
+    p->p[0].uv.v = (uint8)d->v0;
+    p->p[2].uv.u = p->p[0].uv.u;
+    p->p[1].uv.v = (uint8)d->v0;
+    p->p[2].uv.v = (uint8)(d->v0 + h - 1);
+    p->p[3].uv.u = p->p[1].uv.u;
+    p->p[3].uv.v = p->p[2].uv.v;
     depth = z - g_camera_world_z;
     if (depth == 0)
         return;
@@ -240,18 +244,18 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
         if (sy0 > g_screen_height / 2 + 0x40 || sy1 < -0x40 - g_screen_height / 2)
             return;
         /* Coordinates are relative to DRAWENV.ofs=(160,64) */
-        p->x0 = p->x2 = (sint16)sx0;
-        p->x1 = p->x3 = (sint16)sx1;
-        p->y0 = p->y1 = (sint16)sy0;
-        p->y2 = p->y3 = (sint16)sy1;
+        p->p[0].xy.x = p->p[2].xy.x = (sint16)sx0;
+        p->p[1].xy.x = p->p[3].xy.x = (sint16)sx1;
+        p->p[0].xy.y = p->p[1].xy.y = (sint16)sy0;
+        p->p[2].xy.y = p->p[3].xy.y = (sint16)sy1;
     }
     else
     {
         const sint32 *trig = original_tables_mips_sine_table();
         sint32 cs, sn, cx, cy, hx = width_world / 2, hy = height_world / 2, i;
         sint32 lx[4] = {-1, 1, -1, 1}, ly[4] = {-1, -1, 1, 1};
-        sint16 *xp[4] = {&p->x0, &p->x1, &p->x2, &p->x3};
-        sint16 *yp[4] = {&p->y0, &p->y1, &p->y2, &p->y3};
+        sint16 *xp[4] = {&p->p[0].xy.x, &p->p[1].xy.x, &p->p[2].xy.x, &p->p[3].xy.x};
+        sint16 *yp[4] = {&p->p[0].xy.y, &p->p[1].xy.y, &p->p[2].xy.y, &p->p[3].xy.y};
         sint32 minx = 0x7fffffff, maxx = -0x7fffffff, sumx = 0, sumy = 0;
         if (!trig)
             return;
@@ -303,6 +307,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
         }
     }
     g_next_frame_object = next;
+#if defined(_DEBUG)
     if (getenv("OA_SPRITE_CALL_TRACE"))
     {
         FILE *f = xport_fopen("sprite_calls_port.log", "a");
@@ -312,6 +317,7 @@ GDB_CALL void render_world_sprite(uint32 resource, sint32 x, sint32 y, sint32 z,
             fclose(f);
         }
     }
+#endif
 }
 
 /* 8008E5D4..8008E7D8: screen-space SPRT plus its TPage DR_MODE packet. */
@@ -324,7 +330,7 @@ GDB_CALL SPRT *render_screen_sprite(sint16 x, sint16 y, uint32 resource, sint16 
     sint32 width, height;
     sprite = (SPRT *)g_gpu_packet_cursor;
     SetSprt(sprite);
-    sprite->r0 = sprite->g0 = sprite->b0 = 0x80;
+    sprite->rgbc.r = sprite->rgbc.g = sprite->rgbc.b = 0x80;
     width = d->width_minus_one;
     width = width ? width : 0x100;
     height = d->height;
@@ -333,11 +339,12 @@ GDB_CALL SPRT *render_screen_sprite(sint16 x, sint16 y, uint32 resource, sint16 
     sprite->h = (sint16)height;
     /* Preserve the original packet coordinates.  DRAWENV.ofs=(160,64) is a
      * GPU state, represented by native renderer metadata at submission. */
-    sprite->x0 = (sint16)(x + d->pivot_x);
-    sprite->y0 = (sint16)(y + 0x40 + d->pivot_y);
-    sprite->u0 = (uint8)d->u0;
-    sprite->v0 = (uint8)d->v0;
-    sprite->clut = (uint16)(d->clut + (ot_bucket == 0 ? g_foreground_sprite_clut_offset : 0));
+    sprite->p[0].xy.x = (sint16)(x + d->pivot_x);
+    sprite->p[0].xy.y = (sint16)(y + 0x40 + d->pivot_y);
+    sprite->p[0].uv.u = (uint8)d->u0;
+    sprite->p[0].uv.v = (uint8)d->v0;
+    sprite->p[0].attr = (uint16)(d->clut + (ot_bucket == 0 ? g_foreground_sprite_clut_offset : 0));
+#if defined(_DEBUG)
     if (getenv("OA_SCREEN_SPRITE_TRACE"))
     {
         static sint32 trace_count;
@@ -346,12 +353,13 @@ GDB_CALL SPRT *render_screen_sprite(sint16 x, sint16 y, uint32 resource, sint16 
             FILE *trace = xport_fopen("screen_sprites_port.log", trace_count ? "a" : "w");
             if (trace)
             {
-                fprintf(trace, "%d,resource=%#x,x=%d,y=%d,u=%u,v=%u,clut=%u,w=%u,h=%u,tpage=%u,ot=%d\n", trace_count, resource, (sint32)sprite->x0, (sint32)sprite->y0, (uint32)sprite->u0, (uint32)sprite->v0, (uint32)sprite->clut, (uint32)sprite->w, (uint32)sprite->h, (uint32)d->tpage, (sint32)ot_bucket);
+                fprintf(trace, "%d,resource=%#x,x=%d,y=%d,u=%u,v=%u,clut=%u,w=%u,h=%u,tpage=%u,ot=%d\n", trace_count, resource, (sint32)sprite->p[0].xy.x, (sint32)sprite->p[0].xy.y, (uint32)sprite->p[0].uv.u, (uint32)sprite->p[0].uv.v, (uint32)sprite->p[0].attr, (uint32)sprite->w, (uint32)sprite->h, (uint32)d->tpage, (sint32)ot_bucket);
                 fclose(trace);
             }
             ++trace_count;
         }
     }
+#endif
     psx_set_prim_screen_offset(160, 64);
     AddPrim(g_current_render_frame->ot + ot_bucket, sprite);
     g_gpu_packet_cursor += sizeof(SPRT);
@@ -375,7 +383,7 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
     {
         memset(&local, 0, sizeof(local));
         SetPolyFT4(&local);
-        local.r0 = local.g0 = local.b0 = 0x80;
+        local.rgbc.r = local.rgbc.g = local.rgbc.b = 0x80;
         q = &local;
     }
     if (!d)
@@ -385,7 +393,7 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
     frame = animation_frame_resource(resource);
     if (!frame)
         return;
-    q->tpage = d->tpage;
+    q->p[1].attr = d->tpage;
     if (d->cached_resource == resource)
     { /* 8008F6F4 has the same cached-width -1 as D108. */
         w = (uint8)(d->width_minus_one - 1);
@@ -410,15 +418,15 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
     y += top;
     if (width_world < 0)
         width_world = -width_world;
-    q->clut = d->clut;
-    q->u0 = (uint8)d->u0;
-    q->v0 = (uint8)d->v0;
-    q->u1 = (uint8)(d->u0 + signed_w);
-    q->v1 = (uint8)d->v0;
-    q->u2 = q->u0;
-    q->v2 = (uint8)(d->v0 + h - 1);
-    q->u3 = q->u1;
-    q->v3 = q->v2;
+    q->p[0].attr = d->clut;
+    q->p[0].uv.u = (uint8)d->u0;
+    q->p[0].uv.v = (uint8)d->v0;
+    q->p[1].uv.u = (uint8)(d->u0 + signed_w);
+    q->p[1].uv.v = (uint8)d->v0;
+    q->p[2].uv.u = q->p[0].uv.u;
+    q->p[2].uv.v = (uint8)(d->v0 + h - 1);
+    q->p[3].uv.u = q->p[1].uv.u;
+    q->p[3].uv.v = q->p[2].uv.v;
     depth = z - g_camera_world_z;
     if (depth == 0)
         return;
@@ -432,10 +440,10 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
         sy1 = (y + height_world - g_camera_world_y) * 0x163 / depth;
         if (sy0 > g_screen_height / 2 || sy1 < -(g_screen_height / 2))
             return;
-        q->x0 = q->x2 = (sint16)sx0;
-        q->x1 = q->x3 = (sint16)sx1;
-        q->y0 = q->y1 = (sint16)sy0;
-        q->y2 = q->y3 = (sint16)sy1;
+        q->p[0].xy.x = q->p[2].xy.x = (sint16)sx0;
+        q->p[1].xy.x = q->p[3].xy.x = (sint16)sx1;
+        q->p[0].xy.y = q->p[1].xy.y = (sint16)sy0;
+        q->p[2].xy.y = q->p[3].xy.y = (sint16)sy1;
     }
     else
     {
@@ -444,14 +452,14 @@ void render_world_sprite_immediate(uint32 resource, sint32 x, sint32 y, sint32 z
         sint32 hx = ww / 2, hy = hh / 2, lx[4] = {-1, 1, -1, 1}, ly[4] = {-1, -1, 1, 1};
         sint16 *xp[4], *yp[4];
         sint32 i, sumx = 0, sumy = 0;
-        xp[0] = &q->x0;
-        xp[1] = &q->x1;
-        xp[2] = &q->x2;
-        xp[3] = &q->x3;
-        yp[0] = &q->y0;
-        yp[1] = &q->y1;
-        yp[2] = &q->y2;
-        yp[3] = &q->y3;
+        xp[0] = &q->p[0].xy.x;
+        xp[1] = &q->p[1].xy.x;
+        xp[2] = &q->p[2].xy.x;
+        xp[3] = &q->p[3].xy.x;
+        yp[0] = &q->p[0].xy.y;
+        yp[1] = &q->p[1].xy.y;
+        yp[2] = &q->p[2].xy.y;
+        yp[3] = &q->p[3].xy.y;
         if (!trig)
             return;
         cs = div_trunc_256(trig[(rotation + 0x100) & 0x3ff]);
@@ -496,6 +504,7 @@ void sprite_descriptor_table_register(uint32 resource_id, sint32 unused, void *b
 
 sint32 sprite_resource_dump_audit(const char *path)
 {
+#if defined(_DEBUG)
     FILE *file;
     VRAM_SPRITE *descriptor;
     sint32 index, count = (sint32)(descriptor_next - descriptor_pool);
@@ -512,6 +521,9 @@ sint32 sprite_resource_dump_audit(const char *path)
     }
     fclose(file);
     return 1;
+#else
+    return 0;
+#endif
 }
 
 /* Original: FUN_8008CFB0. */
@@ -531,6 +543,7 @@ void sprite_upload_pixels(void *raw_descriptor, uint8 *pixels, sint32 mode)
     width = (sint32)d->u1 - (sint32)d->u0 + 1;
     rect.w = (sint16)(mode == 0 ? (width < 0 ? (width + 3) / 4 : width / 4) : width / 2);
     rect.h = (sint16)((sint32)d->v1 - (sint32)d->v0 + 1);
+#if defined(_DEBUG)
     if (getenv("OA_PLAYER_UPLOAD_TRACE") && (g_current_sprite_upload_resource >> 10) == 0x30)
     {
         static sint32 trace_count;
@@ -542,6 +555,7 @@ void sprite_upload_pixels(void *raw_descriptor, uint8 *pixels, sint32 mode)
         }
         trace_count++;
     }
+#endif
     LoadImagePSX(&rect, (uint32 *)pixels);
     DrawSync(0);
 }
@@ -635,6 +649,7 @@ GDB_CALL uint32 sprite_clut_upload(uint32 resource_id, sint32 unused_2, sint32 u
     rect.y = g_clut_upload_y;
     rect.w = (sint16)count;
     rect.h = 1;
+#if defined(_DEBUG)
     if (getenv("OA_CLUT_TRACE"))
     {
         static sint32 clut_trace_count;
@@ -646,6 +661,7 @@ GDB_CALL uint32 sprite_clut_upload(uint32 resource_id, sint32 unused_2, sint32 u
         }
         clut_trace_count++;
     }
+#endif
     LoadImagePSX(&rect, (uint32 *)converted);
     DrawSync(0);
     x = (uint16)g_clut_upload_x;
@@ -687,14 +703,14 @@ void render_background_strips(uint16 x, sint32 y, sint32 rows, sint8 u_offset)
             sint32 shade = g_background_brightness_bias + 0x80;
             if (shade < 0)
                 shade = 0;
-            p->r0 = p->g0 = p->b0 = (uint8)shade;
+            p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
             p->w = 0x40;
             p->h = 0x40;
             /* 0x8008E880 stores s2 directly after FUN_8008E5D4, replacing
              * that helper's internal +0x40.  DRAWENV.ofs.y=64 is still
              * applied later by the GPU. */
-            p->y0 = (sint16)y;
-            p->u0 = (uint8)(p->u0 + u_offset);
+            p->p[0].xy.y = (sint16)y;
+            p->p[0].uv.u = (uint8)(p->p[0].uv.u + u_offset);
         }
     }
 }
@@ -737,7 +753,7 @@ void render_stage_background(void)
         if (shade < 0)
             shade = 0;
         p->h = 0x100;
-        p->r0 = p->g0 = p->b0 = (uint8)shade;
+        p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
     }
 }
 

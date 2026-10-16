@@ -232,6 +232,7 @@ sint32 model_attribute_find(sint16 model_id)
 
 static void trace_map_object(const char *phase, MAP_RUNTIME *object)
 {
+#if defined(_DEBUG)
     static sint32 started;
     static sint32 sequence;
     FILE *trace;
@@ -246,6 +247,7 @@ static void trace_map_object(const char *phase, MAP_RUNTIME *object)
     }
     started = 1;
     sequence++;
+#endif
 }
 
 /* Original: FUN_800A6D64. */

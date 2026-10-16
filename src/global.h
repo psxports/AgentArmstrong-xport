@@ -4,8 +4,17 @@
 #include "xport.h"
 #include "psx.h"
 
-/* Port convenience cheat: expose every mission in the world-map selector. */
-#define LEVEL_SELECT 1
+/* Xcrt disables Release environment overrides */
+#if defined(XPORT_XCRT)
+    #define getenv(name) ((char *)0)
+#endif
+
+/* Port convenience cheat: expose every mission in Debug builds */
+#if defined(_DEBUG)
+    #define LEVEL_SELECT 1
+#else
+    #define LEVEL_SELECT 0
+#endif
 
 typedef void (*CD_CALLBACK)(void);
 

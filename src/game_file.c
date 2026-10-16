@@ -42,14 +42,14 @@ static FILE *open_data_file(const char *path, const char *mode)
         relative += 5;
     if (configured_root != NULL && strlen(configured_root) + strlen(relative) + 7 < sizeof(candidate))
     {
-        sprintf(candidate, "%s/DATA/%s", configured_root, relative);
+        snprintf(candidate, sizeof(candidate), "%s/DATA/%s", configured_root, relative);
         file = xport_fopen(candidate, mode);
         if (file != NULL)
             return file;
     }
     if (strlen(relative) + 6 >= sizeof(candidate))
         return NULL;
-    sprintf(candidate, "DATA/%s", relative);
+    snprintf(candidate, sizeof(candidate), "DATA/%s", relative);
     return xport_fopen(candidate, mode);
 }
 
@@ -124,11 +124,13 @@ sint32 app_file_read(const char *path, void *destination, sint32 capacity, sint3
         return 0;
     }
     size = (sint32)fread(destination, 1, capacity, file);
+#if defined(_DEBUG)
     if (ferror(file))
     {
         fclose(file);
         return 0;
     }
+#endif
     fclose(file);
     if (size_out != NULL)
         *size_out = size;

@@ -23,6 +23,7 @@
 #include "render.h"
 #include "resource_table.h"
 #include "runtime_heap.h"
+#include "save.h"
 #include "spatial.h"
 #include "sprite.h"
 #include "sprite_renderer.h"
@@ -155,11 +156,14 @@ static uint8 drawn_nodes[0x80];
 
 /* HQ.BIN data consumed by this state machine (0x800FADD4, 0x800FADDC and
  * 0x800FADE4..0x800FAE70), retained byte-for-byte instead of host pointers. */
+#if 0 /* Native save/load uses xport_save and xport_load */
 static const char hq_save_header[7] = {'A', 'G', 'E', 'N', 'T', ' ', 0};
 
 static const char hq_slot_text[] = "SLOT";
 
 static const uint8 hq_card_layout[140] = {0x42, 0x45, 0x53, 0x4c, 0x45, 0x53, 0x2d, 0x30, 0x30, 0x34, 0x37, 0x34, 0x53, 0x4c, 0x4f, 0x54, 0, 0, 0, 0, 0x56, 0x49, 0x52, 0x47, 0x49, 0x4e, 0x20, 0x53, 0x54, 0x41, 0x46, 0x46, 0, 0, 0, 0, 0x4d, 0x41, 0x52, 0x43, 0x55, 0x53, 0, 0, 0x53, 0x54, 0x45, 0x50, 0x48, 0x41, 0x4e, 0x45, 0, 0, 0, 0, 0x50, 0x41, 0x55, 0x4c, 0, 0, 0, 0, 0x4d, 0x41, 0x52, 0x4b, 0, 0, 0, 0, 0x4a, 0x4f, 0x59, 0x4c, 0x59, 0x4f, 0x4e, 0, 0x52, 0x41, 0x46, 0x46, 0x41, 0x45, 0x4c, 0x45, 0, 0, 0, 0, 0x48, 0x51, 0x5c, 0x45, 0x47, 0x54, 0x2e, 0x42, 0x49, 0x4e, 0, 0, 0x48, 0x51, 0x5c, 0x46, 0x47, 0x54, 0x2e, 0x42, 0x49, 0x4e, 0, 0, 0x48, 0x51, 0x5c, 0x47, 0x47, 0x54, 0x2e, 0x42, 0x49, 0x4e, 0, 0, 0x48, 0x51, 0x5c, 0x53, 0x47, 0x54, 0x2e, 0x42, 0x49, 0x4e, 0, 0x3e};
+
+#endif
 
 /* Functions. */
 /* Original: FUN_800FD95C. */
@@ -232,6 +236,7 @@ GDB_CALL void hq_sliding_hud_update(void *raw_object)
     render_screen_sprite((sint16)mirrored_x, 0x20, 0x25c01, 0);
 }
 
+#if 0 /* Native memory-card warning menu is disabled */
 /* Original: FUN_800FDC8C. */
 GDB_CALL void hq_memory_card_warning_show(void)
 {
@@ -279,6 +284,7 @@ GDB_CALL void hq_memory_card_warning_show(void)
     }
     memory_card_system_shutdown();
 }
+#endif
 
 /* Original: FUN_800ABEA0. */
 GDB_CALL sint16 hq_scrolling_text_render(const char *text, sint16 x, sint16 extent, const char *caption, sint32 automatic)
@@ -455,6 +461,7 @@ EFFECT *hq_effect_3b_get(void)
 void hq_set_pending_transition(void)
 {
     hq_pending_transition = 1;
+#if defined(_DEBUG)
     if (getenv("OA_MISSION_LAUNCH_TRACE") != 0)
     {
         FILE *trace = xport_fopen("mission_launch_port.log", "a");
@@ -464,6 +471,7 @@ void hq_set_pending_transition(void)
             fclose(trace);
         }
     }
+#endif
 }
 
 static void preserve_player_position(void)
@@ -666,8 +674,11 @@ void hq_world_map_update(HQ_WORLD_MAP_SELECTOR *object)
             if ((node->flags & 0x80) != 0)
             {
                 HQ_MAP_NODE *linked = hq_world_map_node_find_by_id((sint16)(node->flags & 0x3f));
-                if (linked && linked->unlocked)
+                if (linked && linked->unlocked && !node->unlocked)
+                {
                     node->unlocked = 1;
+                    game_progress_save();
+                }
                 available = node->unlocked;
             }
             if (node->region != g_hq_map_region)
@@ -733,9 +744,9 @@ void hq_world_map_update(HQ_WORLD_MAP_SELECTOR *object)
             if (index == g_hq_selected_map_node)
             {
                 sint8 c = (sint8)((char)g_frame_counter * 0x10 - 0x80);
-                packet->r0 = (uint8)c;
-                packet->g0 = (uint8)c;
-                packet->b0 = (uint8)c;
+                packet->rgbc.r = (uint8)c;
+                packet->rgbc.g = (uint8)c;
+                packet->rgbc.b = (uint8)c;
             }
             memset(drawn_nodes, 0, sizeof(drawn_nodes));
             for (route = 0; route < 4; route++)
@@ -928,6 +939,7 @@ GDB_CALL void hq_gramophone_open(void)
     music_track_select(object->selected_track, 0);
 }
 
+#if 0 /* Native memory-card save/load menus are disabled */
 static const char *exe_pointer(uint32 address)
 {
     return (const char *)player_assets_executable_pointer(address);
@@ -1229,6 +1241,7 @@ GDB_CALL void hq_memory_card_manager_open(sint32 mode)
     g_pressed_buttons = 0;
     *ptr_at(sint16, object, 0xd28) = 3;
 }
+#endif
 
 /* Original: FUN_800FC538. */
 GDB_CALL void hq_sliding_hud_create(void)
@@ -1285,8 +1298,10 @@ void hq_level_update(void)
     hq_effect_3d = effect_find_next(0x3d, 0);
     hq_effect_3f = effect_find_next(0x3f, 0);
 
+#if defined(_DEBUG)
     if (trace_position_pending)
         remove("mission_launch_port.log");
+#endif
 
     hq_sliding_hud_create();
     hq_background_texture_select(0);
@@ -1380,6 +1395,7 @@ void hq_level_update(void)
             hq_gramophone_close();
         }
 
+#if 0 /* Native memory-card save/load area is disabled */
         if (hq_effect_3f != 0 && g_player_world_x > hq_effect_3f->x - 0x3000 && g_player_world_x < hq_effect_3f->x + 0x3000 &&
             /* 800FB264/800FB268: same inclusive lower Z boundary. */
             g_player_world_z >= hq_effect_3f->z)
@@ -1398,6 +1414,7 @@ void hq_level_update(void)
         {
             object_destroy_all_by_type(0x3f);
         }
+#endif
 
         end_frame_submit(g_stage_background_resource);
 

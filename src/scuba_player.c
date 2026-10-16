@@ -222,7 +222,7 @@ typedef char ScubaPlayer_node_table_at_678[offsetof(SCUBA_PLAYER, node_table) ==
 #endif
 
 /* Macros. */
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
 static uint32 scuba_trace_seen;
 
 static void scuba_trace(uint32 bit, const char *tag, void *raw)
@@ -379,7 +379,7 @@ static void scuba_ship_target_damage(SCUBA_SHIP_TARGET *object, FLASHABLE *hit)
 /* Original: SCUBA_800FED94. */
 static void scuba_ship_target_update(SCUBA_SHIP_TARGET *object)
 {
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         static sint32 seen;
         if (!seen && getenv("OA_STAGE20_TRACE"))
@@ -428,7 +428,7 @@ void scuba_ship_target_create(EFFECT *effect)
     object->collision.box_y /= 2;
     effect->type = 0;
     object->owner_effect = effect;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (getenv("OA_STAGE20_TRACE"))
     {
         static sint32 count;
@@ -449,7 +449,7 @@ void scuba_ship_target_create(EFFECT *effect)
 static void scuba_tug_target_update(SCUBA_TUG_TARGET *o)
 {
     MODEL_NODE *node = &o->nodes[0];
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         static sint32 seen;
         if (!seen && getenv("OA_TUG_TRACE"))
@@ -560,7 +560,7 @@ void scuba_tug_target_create(EFFECT *effect)
     object->nodes[0].rotation_x = 0;
     object->nodes[0].rotation_z = 0;
     object->nodes[0].rotation_y = (sint16)(random_range(0x200) + 0x300);
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (getenv("OA_TUG_TRACE"))
     {
         static sint32 count;
@@ -1376,7 +1376,6 @@ static void scuba_player_update(SCUBA_PLAYER *player)
                 shot->lifetime = 0x96;
                 shot->field_d4 = target->z;
             }
-            (void)steps;
         }
     }
     else
@@ -1510,7 +1509,7 @@ static void scuba_mine_update(SCUBA_MINE *object)
 {
     sint32 dx, dy, dz, flash = 0;
     scuba_trace(0x20, "UPDATE69", (uint8 *)object - 4);
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         static sint32 seen;
         if (!seen && getenv("OA_STAGE19_TRACE"))
@@ -1650,7 +1649,7 @@ void scuba_player_create(sint32 x, sint32 y, sint32 z)
     SetPolyFT4((POLY_FT4 *)player->collision.prim);
     setShadeTex((POLY_FT4 *)player->collision.prim, 0);
     player->collision.sends_mask = 2;
-    ((POLY_FT4 *)player->collision.prim)->clut = g_player_sprite_clut;
+    ((POLY_FT4 *)player->collision.prim)->p[0].attr = g_player_sprite_clut;
     collision_box_set(player, 0x60, 0x20, 6);
     player->collision.x = x;
     player->collision.y = y;

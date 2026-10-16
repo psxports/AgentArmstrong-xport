@@ -19,6 +19,7 @@
 #include "projectile.h"
 #include "psx.h"
 #include "random.h"
+#include "save.h"
 #include "render.h"
 #include "runtime_heap.h"
 #include "scuba_player.h"
@@ -501,6 +502,7 @@ begin_completion:
     counts = mission_objective_counts();
     if (g_secondary_objective_count == 0 || g_secondary_objective_count <= (counts & 0xffff))
         record->unlocked = 2;
+    game_progress_save();
 }
 
 /* Original: FUN_800A4184. */
@@ -763,7 +765,7 @@ void tower_surface_trigger_update(EFFECT *effect)
     if (g_player_world_y < effect->y + 0x1f00 - ((sint16)effect->values[0] << 8) || effect->y + 0x2300 < g_player_world_y)
         return;
     g_player->surface_state = 1;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (g_stage_index == 28 && getenv("OA_STAGE28_TRACE"))
     {
         FILE *f = xport_fopen("../status/the-tower-native.log", "w");
@@ -815,7 +817,7 @@ void falling_hazard_create(EFFECT *effect)
     object->damage = 0xaa;
     collision_box_set(object, 0x60, 0x60, 0x60);
     object->collision.box_y += 0x3000;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (g_stage_index == 26 && getenv("OA_STAGE26_TRACE"))
     {
         sint32 player_x = g_player_world_x;
@@ -1018,6 +1020,7 @@ static sint32 projectile_test_path(sint32 x0, sint32 y0, sint32 z0, sint32 x1, s
  * DAT_800D3DA4 == 0. */
 void mission_enemy_fire(MISSION_ENEMY_ACTOR *object)
 {
+#if defined(_DEBUG)
     if (getenv("OA_MISSION_ENEMY_TRACE"))
     {
         static sint32 shots;
@@ -1032,6 +1035,7 @@ void mission_enemy_fire(MISSION_ENEMY_ACTOR *object)
             ++shots;
         }
     }
+#endif
     sint32 direction = object->display_direction;
     sint32 z_offset = direction == 0 ? 0x100 : (direction == 2 ? -0x100 : 0);
     sint32 x_offset = direction == 1 ? 0x100 : (direction == 3 ? -0x100 : 0);
@@ -1063,6 +1067,7 @@ void mission_enemy_update(MISSION_ENEMY_ACTOR *object)
     sint32 scale = object->collision.object_type == 0x1d ? 0x1400 : g_default_model_scale;
     sint32 destination_x, destination_z;
     sint32 direction, display_direction, frame_offset;
+#if defined(_DEBUG)
     if (getenv("OA_MISSION_ENEMY_STATE_TRACE"))
     {
         static sint32 count;
@@ -1079,6 +1084,7 @@ void mission_enemy_update(MISSION_ENEMY_ACTOR *object)
             ++count;
         }
     }
+#endif
     g_mission_enemy_update_count++;
     active = mission_enemy_update_visibility(&object->collision, source, object->collision.object_type, g_resource_clut_table[(uint32)object->render_resource >> 10]);
     if (active == 0)
@@ -1479,7 +1485,7 @@ void airfield_enemy_fire(MISSION_ENEMY_ACTOR *object)
     projectile->floor_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_trail_update;
     projectile->impact_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_impact;
     projectile->collision.object_type = 0;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
@@ -1546,7 +1552,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
     sint32 route_index_bias;
     MISSION_ENEMY_ACTOR *object;
 
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (source_type == 0x49 && g_stage_index == 17 && source == g_effects + 9)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
@@ -1746,7 +1752,7 @@ MISSION_ENEMY_ACTOR *mission_enemy_create(EFFECT *source)
         object->collision.x = waypoint->x;
         object->collision.z = waypoint->z;
     }
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (object_type == 0x49 && g_stage_index == 17 && source == g_effects + 9)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
@@ -1810,7 +1816,7 @@ void drop_range_create(EFFECT *first)
         second = effect_find_next(0x45, second + 1);
     if (second == 0)
     {
-        sprintf(message, "DROPRANGE FX %d %d,%d", (sint16)first->values[0], first->x / 0x4000, first->y / 0x100);
+        snprintf(message, sizeof(message), "DROPRANGE FX %d %d,%d", (sint16)first->values[0], first->x / 0x4000, first->y / 0x100);
         fatal_error(message);
         return;
     }
@@ -1951,7 +1957,7 @@ void flare_area_create(EFFECT *first)
         second = effect_find_next(type, second + 1);
     if (second == 0)
     {
-        sprintf(message, "FLAREAREA FX %d %d,%d", (sint16)first->values[0], first->x / 0x4000, first->y / 0x100);
+        snprintf(message, sizeof(message), "FLAREAREA FX %d %d,%d", (sint16)first->values[0], first->x / 0x4000, first->y / 0x100);
         fatal_error(message);
         return;
     }
@@ -1982,12 +1988,12 @@ static void mission_objective_complete(sint16 primary, sint16 secondary)
     if (g_primary_objective_states[primary] == 0 && primary != 0)
     {
         g_primary_objective_states[primary] = 1;
-        sprintf(text, (const char *)player_assets_executable_pointer(0x80082774u), integer_to_text(primary));
+        snprintf(text, sizeof(text), (const char *)player_assets_executable_pointer(0x80082774u), integer_to_text(primary));
     }
     if (g_secondary_objective_states[secondary] == 0 && secondary != 0)
     {
         g_secondary_objective_states[secondary] = 1;
-        sprintf(text, (const char *)player_assets_executable_pointer(0x80082778u), integer_to_text(secondary));
+        snprintf(text, sizeof(text), (const char *)player_assets_executable_pointer(0x80082778u), integer_to_text(secondary));
     }
     mission_text_message_create(text);
     effect = world_sprite_create(g_player_world_x, g_player_world_y, g_player_world_z, mission_complete_animation);
@@ -2033,14 +2039,14 @@ sint32 mission_objective_script_update(sint32 script_address)
         {
             if (g_primary_objective_states[primary] == 0 && primary != 0)
             {
-                sprintf(text, (const char *)player_assets_executable_pointer(0x8008277cu), primary);
+                snprintf(text, sizeof(text), (const char *)player_assets_executable_pointer(0x8008277cu), primary);
                 g_primary_objective_states[primary] = 2;
                 mission_text_message_create(text);
                 player_death_begin();
             }
             if (g_secondary_objective_states[secondary] == 0 && secondary != 0)
             {
-                sprintf(text, (const char *)player_assets_executable_pointer(0x80082780u), secondary);
+                snprintf(text, sizeof(text), (const char *)player_assets_executable_pointer(0x80082780u), secondary);
                 g_secondary_objective_states[secondary] = 2;
                 mission_text_message_create(text);
             }
@@ -2169,15 +2175,15 @@ void hud_bar_initialize(void *hud_value, sint32 x, sint32 y, sint32 width, sint3
     hud->maximum = maximum + 1;
     SetPolyG4(fill);
     SetPolyF4(border);
-    border->x0 = (sint16)(x - 1);
-    border->y0 = (sint16)(y + 0x3f);
-    border->x1 = (sint16)(x + width);
-    border->y1 = (sint16)(y + 0x3f);
-    border->x2 = (sint16)(x - 1);
-    border->y2 = (sint16)(y + 0x47);
-    border->x3 = (sint16)(x + width);
-    border->y3 = (sint16)(y + 0x47);
-    border->r0 = border->g0 = border->b0 = 0;
+    border->p[0].x = (sint16)(x - 1);
+    border->p[0].y = (sint16)(y + 0x3f);
+    border->p[1].x = (sint16)(x + width);
+    border->p[1].y = (sint16)(y + 0x3f);
+    border->p[2].x = (sint16)(x - 1);
+    border->p[2].y = (sint16)(y + 0x47);
+    border->p[3].x = (sint16)(x + width);
+    border->p[3].y = (sint16)(y + 0x47);
+    border->rgbc.r = border->rgbc.g = border->rgbc.b = 0;
 }
 
 /* Direct translation of 0x800A0930..0x800A0BEC. */
@@ -2201,14 +2207,14 @@ void hud_bar_render(void *hud_value, sint32 amount, sint32 unused, sint32 zero_w
             empty_width = 1;
         full_ratio = (width << 16) / empty_width;
         empty_ratio = (width << 16) / (width - empty_width);
-        fill->r0 = fill->r1 = fill->r2 = fill->r3 = (uint8)(0xff0000 / empty_ratio);
-        fill->g0 = fill->g1 = fill->g2 = fill->g3 = (uint8)(0xff0000 / full_ratio);
+        fill->p[0].rgbc.r = fill->p[1].rgbc.r = fill->p[2].rgbc.r = fill->p[3].rgbc.r = (uint8)(0xff0000 / empty_ratio);
+        fill->p[0].rgbc.g = fill->p[1].rgbc.g = fill->p[2].rgbc.g = fill->p[3].rgbc.g = (uint8)(0xff0000 / full_ratio);
         visible_width = empty_width;
     }
-    fill->x0 = fill->x2 = (sint16)hud->x;
-    fill->x1 = fill->x3 = (sint16)(hud->x + visible_width);
-    fill->y0 = fill->y1 = (sint16)hud->y;
-    fill->y2 = fill->y3 = (sint16)(hud->y + 6);
+    fill->p[0].xy.x = fill->p[2].xy.x = (sint16)hud->x;
+    fill->p[1].xy.x = fill->p[3].xy.x = (sint16)(hud->x + visible_width);
+    fill->p[0].xy.y = fill->p[1].xy.y = (sint16)hud->y;
+    fill->p[2].xy.y = fill->p[3].xy.y = (sint16)(hud->y + 6);
     if (amount != 0)
     {
         memcpy(g_gpu_packet_cursor, fill, sizeof(*fill));
@@ -2293,6 +2299,7 @@ void mission_hud_render(void)
             enabled = 1;
         }
     }
+#if defined(_DEBUG)
     {
         const char *trace_name = getenv("OA_MISSION_HUD_TRACE");
         if (trace_name)
@@ -2310,6 +2317,7 @@ void mission_hud_render(void)
             }
         }
     }
+#endif
     if (g_target_indicator_enabled != 0)
         draw_target_indicator();
     if (g_scuba_stage_active == 0)

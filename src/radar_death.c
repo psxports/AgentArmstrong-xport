@@ -88,9 +88,9 @@ static void radar_vehicle_update(RADAR_VEHICLE *object)
         return;
     }
     player_push_out_of_box(object->collision.x, object->collision.y, object->collision.z, 0x3800, 0xaa00, 0x3800);
-    root->world_x = object->collision.x - g_camera_world_x;
-    root->world_y = object->collision.y - g_camera_world_y;
-    root->world_z = object->collision.z - g_camera_world_z;
+    root->translation_x = object->collision.x - g_camera_world_x;
+    root->translation_y = object->collision.y - g_camera_world_y;
+    root->translation_z = object->collision.z - g_camera_world_z;
     object->nodes[1].rotation_y = (sint16)((object->nodes[1].rotation_y + 0x30) & 0xfff);
     fixed_dda_initialize(aim->world_x, aim->world_y, aim->world_z, g_player_world_x, g_player_world_y, g_player_world_z, object->field_650);
     a = object->field_650[5];

@@ -308,15 +308,15 @@ void debug_player_cell_coordinates_draw(void)
 {
     char text[32];
     sint32 value;
-    sprintf(text, "%d", g_player_world_x / 0x4000);
+    snprintf(text, sizeof(text), "%d", g_player_world_x / 0x4000);
     text_render(text, 0x6e, 0);
     value = g_player_world_y / 0x4000;
     if (value < 0)
         value = -value;
-    sprintf(text, "%d", value);
+    snprintf(text, sizeof(text), "%d", value);
     text_render(text, 0x6e, 0x10);
     value = g_map_depth_cells - (((g_map_depth_cells * 0xc0 - g_player_world_z / 0x100) / 0x40) + 1);
-    sprintf(text, "%d", value);
+    snprintf(text, sizeof(text), "%d", value);
     text_render(text, 0x6e, 0x20);
 }
 

@@ -36,7 +36,7 @@ GDB_CALL const char *loading_image_next_path(void)
 GDB_CALL char *integer_to_text(sint32 value)
 {
     static char text[32];
-    sprintf(text, "%d", value);
+    snprintf(text, sizeof(text), "%d", value);
     return text;
 }
 
@@ -127,6 +127,6 @@ GDB_CALL void sound_system_shutdown(void)
 void fatal_error_with_value(const char *prefix, sint32 value)
 {
     char message[40];
-    sprintf(message, "%s%d", prefix, value);
+    snprintf(message, sizeof(message), "%s%d", prefix, value);
     fatal_error(message);
 }

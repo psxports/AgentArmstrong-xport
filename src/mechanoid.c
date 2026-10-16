@@ -36,6 +36,7 @@ static uint32 trace_updates;
 /* Functions. */
 static void mechanoid_trace(const char *event, MECHANOID_ACTOR *b)
 {
+#if defined(_DEBUG)
     const char *name = getenv("OA_MECHANOID_TRACE");
     FILE *f;
     if (!name || !b)
@@ -47,6 +48,7 @@ static void mechanoid_trace(const char *event, MECHANOID_ACTOR *b)
         fprintf(f, "event,tick,x,y,z,hp,phase,frame,part,flags,yaw,aim,model_base\n");
     fprintf(f, "%s,%u,%d,%d,%d,%d,%d,%d,%d,%u,%d,%d,%d\n", event, g_frame_counter, b->collision.x, b->collision.y, b->collision.z, b->health, b->phase, b->animation.frame, b->animation.delay, b->animation.flags, b->nodes[0].rotation_y, b->aim_yaw, g_mechanoid_model_base);
     fclose(f);
+#endif
 }
 
 sint32 mechanoid_load_resources(void)

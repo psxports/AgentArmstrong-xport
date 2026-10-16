@@ -29,12 +29,14 @@ static void animation_callback(uint32 psx_address, void *owner)
             break;
         default:
         {
+#if defined(_DEBUG)
             FILE *log = xport_fopen("animation_error.log", "w");
             if (log)
             {
                 fprintf(log, "unsupported callback=%08X owner=%p\n", psx_address, owner);
                 fclose(log);
             }
+#endif
             fatal_error("BAD ANIM CALLBACK");
             abort();
         }

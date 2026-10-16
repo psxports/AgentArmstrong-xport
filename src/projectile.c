@@ -314,7 +314,7 @@ void world_sprite_update(SPRITE *object)
         {
             render_world_sprite(frame, object->collision.x, object->collision.y, object->collision.z, object->velocity_x, object->scale_x, object->scale_y, (POLY_FT4 *)object->collision.prim, object->field_ac, object->field_9e, descriptor, object->rotation_x);
             if (object->clut_override != 0)
-                ((POLY_FT4 *)object->collision.prim)->clut = object->clut_override;
+                ((POLY_FT4 *)object->collision.prim)->p[0].attr = object->clut_override;
         }
     }
     else if (object->render_kind == 1)

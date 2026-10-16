@@ -410,7 +410,7 @@ void v2_rocket_create(EFFECT *e)
     }
     if (g_stage_index == 14)
         o->forced_launch = 1;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (g_stage_index == 25 && getenv("OA_STAGE25_TRACE"))
     {
         FILE *file = xport_fopen("../status/v2-jungle-native.log", "w");

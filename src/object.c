@@ -23,7 +23,7 @@ void object_hit_flash_apply(void *object_value)
     {
         --object->flash_clut_ticks;
         POLY_FT4 *prim = (POLY_FT4 *)((uint8 *)(intptr)g_transient_prim_cursor - sizeof(POLY_FT4));
-        prim->clut = (uint16)g_hit_flash_clut;
+        prim->p[0].attr = (uint16)g_hit_flash_clut;
     }
 }
 

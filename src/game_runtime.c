@@ -38,8 +38,8 @@ typedef struct
 #if defined(AP_32BIT)
 typedef char PolyFt3_size_20[sizeof(POLY_FT3) == 0x20 ? 1 : -1];
 typedef char PolyFt4_size_28[sizeof(POLY_FT4) == 0x28 ? 1 : -1];
-typedef char PolyFt4_clut_0e[offsetof(POLY_FT4, clut) == 0x0e ? 1 : -1];
-typedef char PolyFt4_tpage_16[offsetof(POLY_FT4, tpage) == 0x16 ? 1 : -1];
+typedef char PolyFt4_clut_0e[(offsetof(POLY_FT4, p) + offsetof(POINT_T, attr)) == 0x0e ? 1 : -1];
+typedef char PolyFt4_tpage_16[(offsetof(POLY_FT4, p) + sizeof(POINT_T) + offsetof(POINT_T, attr)) == 0x16 ? 1 : -1];
 typedef char TimFileHeader_size_08[sizeof(TIM_FILE_HEADER) == 0x08 ? 1 : -1];
 typedef char TimDataBlock_rect_04[offsetof(TIM_DATA_BLOCK, rectangle) == 0x04 ? 1 : -1];
 typedef char TimDataBlock_pixels_0c[offsetof(TIM_DATA_BLOCK, pixels) == 0x0c ? 1 : -1];
@@ -308,6 +308,7 @@ void psx_cd_stop_driver(void)
 
 static void dump_ot_trace_once(void)
 {
+#if defined(_DEBUG)
     static sint32 done;
     const char *enabled = getenv("OA_OT_TRACE");
     FILE *f;
@@ -330,6 +331,7 @@ static void dump_ot_trace_once(void)
         fprintf(f, "%d,%d,%u,%s,%d,%d,%d,%d,%d,%u,%u\n", i, bucket, code, kind, owner ? owner->world_x : 0, owner ? owner->world_y : 0, owner ? owner->world_z : 0, p && ((code & 0xfc) == 0x64) ? *(sint16 *)(p + 8) : 0, p && ((code & 0xfc) == 0x64) ? *(sint16 *)(p + 10) : 0, p && ((code & 0xfc) == 0x64) ? p[12] : 0, p && ((code & 0xfc) == 0x64) ? p[13] : 0);
     }
     fclose(f);
+#endif
 }
 
 void psx_set_model_packet_context(sint32 id, sint32 x, sint32 y, sint32 z, sint32 ry, sint32 rx, sint32 rz)
@@ -355,6 +357,7 @@ void psx_set_hierarchy_packet_trace(sint32 active)
 
 static void trace_sprite_packet(const uint8 *p, const FrameObjectPartial *o)
 {
+#if defined(_DEBUG)
     static sint32 count;
     FILE *f;
     sint32 i;
@@ -369,10 +372,12 @@ static void trace_sprite_packet(const uint8 *p, const FrameObjectPartial *o)
         fprintf(f, "%08x%c", ((const uint32 *)p)[i], i == 9 ? '\n' : ' ');
     fclose(f);
     count++;
+#endif
 }
 
 void psx_ot_trace_begin(void)
 {
+#if defined(_DEBUG)
     const char *e = getenv("OA_LOGICAL_OT_TRACE");
     if (getenv("OA_LOGICAL_OT_REFERENCE_CAMERA"))
     {
@@ -386,34 +391,43 @@ void psx_ot_trace_begin(void)
     logical_ot_seq = 0;
     if (logical_ot_trace)
         fprintf(logical_ot_trace, "FRAME camera=%#x,%#x,%#x\n", g_camera_world_x, g_camera_world_y, g_camera_world_z);
+#endif
 }
 
 void psx_ot_trace_model(sint32 bucket, sint32 id, sint32 x, sint32 y, sint32 z)
 {
+#if defined(_DEBUG)
     if (logical_ot_trace)
         fprintf(logical_ot_trace, "%d,MODEL,bucket=%d,id=%d,x=%#x,y=%#x,z=%#x\n", logical_ot_seq++, bucket, id, x, y, z);
+#endif
 }
 
 void psx_ot_trace_object(const FrameObjectPartial *o, sint32 bucket)
 {
+#if defined(_DEBUG)
     if (logical_ot_trace && o)
         fprintf(logical_ot_trace, "%d,OBJECT,bucket=%d,stored=%d,x=%#x,y=%#x,z=%#x,model=%d\n", logical_ot_seq++, bucket, (sint32)o->ot_bucket, o->world_x, o->world_y, o->world_z, o->model_plus_one);
+#endif
 }
 
 void psx_ot_trace_floor(sint32 bucket, sint32 row_back, sint32 cell_x)
 {
+#if defined(_DEBUG)
     if (logical_ot_trace)
         fprintf(logical_ot_trace, "%d,FLOOR,bucket=%d,row_back=%#x,x=%#x\n", logical_ot_seq++, bucket, row_back, cell_x);
+#endif
 }
 
 void psx_ot_trace_end(void)
 {
+#if defined(_DEBUG)
     if (logical_ot_trace)
     {
         fclose(logical_ot_trace);
         logical_ot_trace = 0;
         logical_ot_done = 1;
     }
+#endif
 }
 
 void psx_set_prim_depth(sint32 world_z)
@@ -480,7 +494,7 @@ void game_runtime_configure(void)
     const char *smoke = getenv("OA_STAGE_SMOKE");
     if (smoke != 0 && *smoke != '\0')
     {
-        smoke_frame_limit = (sint32)strtol(smoke, 0, 0);
+        smoke_frame_limit = (sint32)strtoul(smoke, 0, 0);
         smoke_wait_for_mission = getenv("OA_STAGE_SMOKE_WAIT_RUNTIME") != 0;
         if (smoke_frame_limit < 1)
             smoke_frame_limit = 1;
@@ -575,7 +589,7 @@ sint32 psx_dump_vram(const char *path)
 void psx_end_frame(void)
 {
     const char *dump_frame_text = getenv("OA_VRAM_FRAME_DUMP");
-    sint32 dump_frame = dump_frame_text && *dump_frame_text ? (sint32)strtol(dump_frame_text, 0, 0) : 0;
+    sint32 dump_frame = dump_frame_text && *dump_frame_text ? (sint32)strtoul(dump_frame_text, 0, 0) : 0;
     if (xport_is_headless())
     {
         if (smoke_wait_for_mission && !smoke_mission_started)
@@ -585,10 +599,14 @@ void psx_end_frame(void)
             psx_dump_vram("VRAM_frame.raw");
         if (frame_number >= smoke_frame_limit)
         {
-            const char *stage = getenv("OA_START_STAGE");
             SsQuit();
-            printf("STAGE_SMOKE_PASS stage=%s frames=%d\n", stage ? stage : "HQ", frame_number);
-            fflush(stdout);
+#if defined(_DEBUG)
+            {
+                const char *stage = getenv("OA_START_STAGE");
+                printf("STAGE_SMOKE_PASS stage=%s frames=%d\n", stage ? stage : "HQ", frame_number);
+                fflush(stdout);
+            }
+#endif
             exit(0);
         }
         return;
@@ -1318,22 +1336,22 @@ GDB_CALL void screen_overlay_draw(void)
     prim[5] = 0;
     prim[6] = 0x78;
     prim[7] = 0x38;
-    put16(prim, 8, 0);
+    put16(prim, 8, -g_screen_half_width);
     put16(prim, 10, 0);
     prim[12] = 0;
     prim[13] = 0;
     prim[14] = 0x78;
-    put16(prim, 16, 320);
+    put16(prim, 16, g_screen_half_width);
     put16(prim, 18, 0);
     prim[20] = 0;
     prim[21] = 0;
     prim[22] = 0;
-    put16(prim, 24, 0);
+    put16(prim, 24, -g_screen_half_width);
     put16(prim, 26, 256);
     prim[28] = 0;
     prim[29] = 0;
     prim[30] = 0;
-    put16(prim, 32, 320);
+    put16(prim, 32, g_screen_half_width);
     put16(prim, 34, 256);
     /* 80090388/800903AC/800903E8/80090430 all link at frame+4:
      * byte offset 4 is bucket 1, not bucket 4. */
@@ -1399,17 +1417,21 @@ sint32 psx_load_hq_textures(const uint8 *texinfo, uint32 texinfo_size)
     uint32 archive_size, entry_size;
     sint32 raw, loaded = 0;
     FILE *trace = 0;
+#if defined(_DEBUG)
     remove("floor_tiles_port.csv");
+#endif
     hqtex_archive = (uint8 *)game_file_load("HQ\\HQTEX.CC", &file_size);
     archive_size = (uint32)file_size;
     if (!hqtex_archive || !texinfo)
         return 0;
+#if defined(_DEBUG)
     if (getenv("OA_VRAM_LAYOUT_TRACE"))
     {
         trace = xport_fopen("vram_layout_port.csv", "w");
         if (trace)
             fprintf(trace, "material,tx,resource,u,v,tpage,page_x,page_y,mode,clut\n");
     }
+#endif
     memset(map_textures, 0, sizeof(map_textures));
     memset(model_textures, 0, sizeof(model_textures));
     for (raw = 0; raw < 63 && raw < (sint32)texinfo_size; raw++)
@@ -1424,7 +1446,7 @@ sint32 psx_load_hq_textures(const uint8 *texinfo, uint32 texinfo_size)
         if (tx >= 46)
             continue;
         resource = g_hq_material_resources[tx];
-        sprintf(name, "TX%02u.BIN", (uint32)tx);
+        snprintf(name, sizeof(name), "TX%02u.BIN", (uint32)tx);
         if (!archive_entry(hqtex_archive, archive_size, name, &entry, &entry_size))
             continue;
         resource_table_register(resource, entry);
@@ -1441,8 +1463,10 @@ sint32 psx_load_hq_textures(const uint8 *texinfo, uint32 texinfo_size)
         loaded++;
         if ((resource >> 10) < MODEL_TEXTURE_SLOT_COUNT)
             model_textures[resource >> 10] = map_textures[raw];
+#if defined(_DEBUG)
         if (trace)
             fprintf(trace, "%d,%u,%#x,%u,%u,%u,%u,%u,%u,%u\n", raw, (uint32)tx, resource, map_textures[raw].u, map_textures[raw].v, map_textures[raw].tpage, descriptor->page_x, descriptor->page_y, descriptor->pixel_mode, clut);
+#endif
     }
     /* FUN_800AB7F8..800AB894 (-7 command tail).  Stages whose environment
      * record has a nonzero +0x10 field load one 0x30400 background tile;
@@ -1824,6 +1848,7 @@ sint32 psx_load_stage_textures(const uint8 *texinfo, uint32 texinfo_size, uint32
 
 static void trace_model_packet(const uint8 *p)
 {
+#if defined(_DEBUG)
     static sint32 count;
     FILE *f;
     sint32 i;
@@ -1838,10 +1863,12 @@ static void trace_model_packet(const uint8 *p)
         fprintf(f, "%#010x%c", ((const uint32 *)p)[i], i == 9 ? '\n' : ' ');
     fclose(f);
     count++;
+#endif
 }
 
 static void trace_hierarchy_packet(const POLY_FT3 *packet)
 {
+#if defined(_DEBUG)
     const uint8 *p = (const uint8 *)packet;
     static sint32 count;
     FILE *file;
@@ -1851,11 +1878,12 @@ static void trace_hierarchy_packet(const POLY_FT3 *packet)
     file = xport_fopen("hierarchy_packets_port.log", count ? "a" : "w");
     if (file == 0)
         return;
-    fprintf(file, "HIER_PACKET %d maxz=%d bucket=%d code=%#x clut=%#x tpage=%#x model=%d frame=%u\n", count, prim_world_depth, prim_ot_bucket, packet->code, packet->clut, packet->tpage, g_current_model_id, g_frame_counter);
+    fprintf(file, "HIER_PACKET %d maxz=%d bucket=%d code=%#x clut=%#x tpage=%#x model=%d frame=%u\n", count, prim_world_depth, prim_ot_bucket, packet->rgbc.code, packet->p[0].attr, packet->p[1].attr, g_current_model_id, g_frame_counter);
     for (index = 0; index < 10; index++)
         fprintf(file, "%#010x%c", ((const uint32 *)p)[index], index == 9 ? '\n' : ' ');
     fclose(file);
     count++;
+#endif
 }
 
 void psx_submit_map_ft3(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, sint32 y2, const sint16 *uv, sint32 texture, sint32 shade)
@@ -1870,22 +1898,22 @@ void psx_submit_map_ft3(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, s
     p = (POLY_FT3 *)map_prims[map_prim_count++];
     memset(p, 0, 40);
     p->tag = 0x07000000;
-    p->code = 0x24;
-    p->r0 = p->g0 = p->b0 = (uint8)shade;
-    p->x0 = (sint16)x0;
-    p->y0 = (sint16)y0;
-    p->u0 = (uint8)(uv[0] + s->u);
-    p->v0 = (uint8)(uv[1] + s->v);
-    p->clut = model_clut_override ? model_clut_override : map_clut(texture);
-    p->x1 = (sint16)x1;
-    p->y1 = (sint16)y1;
-    p->u1 = (uint8)(uv[2] + s->u);
-    p->v1 = (uint8)(uv[3] + s->v);
-    p->tpage = map_tpage(texture);
-    p->x2 = (sint16)x2;
-    p->y2 = (sint16)y2; /* FUN_80092D50 stores triangle vertex 2 UV in polygon words 12/13; words 10/11 are the unused FT4 corner. */
-    p->u2 = (uint8)(uv[6] + s->u);
-    p->v2 = (uint8)(uv[7] + s->v);
+    p->rgbc.code = 0x24;
+    p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
+    p->p[0].xy.x = (sint16)x0;
+    p->p[0].xy.y = (sint16)y0;
+    p->p[0].uv.u = (uint8)(uv[0] + s->u);
+    p->p[0].uv.v = (uint8)(uv[1] + s->v);
+    p->p[0].attr = model_clut_override ? model_clut_override : map_clut(texture);
+    p->p[1].xy.x = (sint16)x1;
+    p->p[1].xy.y = (sint16)y1;
+    p->p[1].uv.u = (uint8)(uv[2] + s->u);
+    p->p[1].uv.v = (uint8)(uv[3] + s->v);
+    p->p[1].attr = map_tpage(texture);
+    p->p[2].xy.x = (sint16)x2;
+    p->p[2].xy.y = (sint16)y2; /* FUN_80092D50 stores triangle vertex 2 UV in polygon words 12/13; words 10/11 are the unused FT4 corner. */
+    p->p[2].uv.u = (uint8)(uv[6] + s->u);
+    p->p[2].uv.v = (uint8)(uv[7] + s->v);
     trace_model_packet((const uint8 *)p);
     AddPrim(prim_ot_take(2), p);
 }
@@ -1902,26 +1930,26 @@ void psx_submit_map_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, sint32 x2, s
     p = (POLY_FT4 *)map_prims[map_prim_count++];
     memset(p, 0, 40);
     p->tag = 0x09000000;
-    p->code = 0x2c;
-    p->r0 = p->g0 = p->b0 = (uint8)shade;
-    p->x0 = (sint16)x0;
-    p->y0 = (sint16)y0;
-    p->u0 = (uint8)(uv[0] + s->u);
-    p->v0 = (uint8)(uv[1] + s->v);
-    p->clut = model_clut_override ? model_clut_override : map_clut(texture);
-    p->x1 = (sint16)x1;
-    p->y1 = (sint16)y1;
-    p->u1 = (uint8)(uv[2] + s->u);
-    p->v1 = (uint8)(uv[3] + s->v);
-    p->tpage = map_tpage(texture);
-    p->x2 = (sint16)x2;
-    p->y2 = (sint16)y2;
-    p->u2 = (uint8)(uv[4] + s->u);
-    p->v2 = (uint8)(uv[5] + s->v);
-    p->x3 = (sint16)x3;
-    p->y3 = (sint16)y3;
-    p->u3 = (uint8)(uv[6] + s->u);
-    p->v3 = (uint8)(uv[7] + s->v);
+    p->rgbc.code = 0x2c;
+    p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
+    p->p[0].xy.x = (sint16)x0;
+    p->p[0].xy.y = (sint16)y0;
+    p->p[0].uv.u = (uint8)(uv[0] + s->u);
+    p->p[0].uv.v = (uint8)(uv[1] + s->v);
+    p->p[0].attr = model_clut_override ? model_clut_override : map_clut(texture);
+    p->p[1].xy.x = (sint16)x1;
+    p->p[1].xy.y = (sint16)y1;
+    p->p[1].uv.u = (uint8)(uv[2] + s->u);
+    p->p[1].uv.v = (uint8)(uv[3] + s->v);
+    p->p[1].attr = map_tpage(texture);
+    p->p[2].xy.x = (sint16)x2;
+    p->p[2].xy.y = (sint16)y2;
+    p->p[2].uv.u = (uint8)(uv[4] + s->u);
+    p->p[2].uv.v = (uint8)(uv[5] + s->v);
+    p->p[3].xy.x = (sint16)x3;
+    p->p[3].xy.y = (sint16)y3;
+    p->p[3].uv.u = (uint8)(uv[6] + s->u);
+    p->p[3].uv.v = (uint8)(uv[7] + s->v);
     trace_model_packet((const uint8 *)p);
     AddPrim(prim_ot_take(2), p);
 }
@@ -1959,15 +1987,15 @@ void psx_submit_prepared_model_ft3(sint32 x0, sint32 y0, sint32 x1, sint32 y1, s
         return;
     p = (POLY_FT3 *)map_prims[map_prim_count++];
     memcpy(p, source, 40);
-    p->r0 = p->g0 = p->b0 = (uint8)shade;
-    p->x0 = (sint16)x0;
-    p->y0 = (sint16)y0;
-    p->x1 = (sint16)x1;
-    p->y1 = (sint16)y1;
-    p->x2 = (sint16)x2;
-    p->y2 = (sint16)y2;
+    p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
+    p->p[0].xy.x = (sint16)x0;
+    p->p[0].xy.y = (sint16)y0;
+    p->p[1].xy.x = (sint16)x1;
+    p->p[1].xy.y = (sint16)y1;
+    p->p[2].xy.x = (sint16)x2;
+    p->p[2].xy.y = (sint16)y2;
     if (model_clut_override)
-        p->clut = model_clut_override;
+        p->p[0].attr = model_clut_override;
     trace_hierarchy_packet(p);
     trace_model_packet((const uint8 *)p);
     AddPrim(prim_ot_take(2), p);
@@ -1980,17 +2008,17 @@ void psx_submit_prepared_model_ft4(sint32 x0, sint32 y0, sint32 x1, sint32 y1, s
         return;
     p = (POLY_FT4 *)map_prims[map_prim_count++];
     memcpy(p, source, 40);
-    p->r0 = p->g0 = p->b0 = (uint8)shade;
-    p->x0 = (sint16)x0;
-    p->y0 = (sint16)y0;
-    p->x1 = (sint16)x1;
-    p->y1 = (sint16)y1;
-    p->x2 = (sint16)x2;
-    p->y2 = (sint16)y2;
-    p->x3 = (sint16)x3;
-    p->y3 = (sint16)y3;
+    p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
+    p->p[0].xy.x = (sint16)x0;
+    p->p[0].xy.y = (sint16)y0;
+    p->p[1].xy.x = (sint16)x1;
+    p->p[1].xy.y = (sint16)y1;
+    p->p[2].xy.x = (sint16)x2;
+    p->p[2].xy.y = (sint16)y2;
+    p->p[3].xy.x = (sint16)x3;
+    p->p[3].xy.y = (sint16)y3;
     if (model_clut_override)
-        p->clut = model_clut_override;
+        p->p[0].attr = model_clut_override;
     trace_hierarchy_packet((const POLY_FT3 *)p);
     trace_model_packet((const uint8 *)p);
     AddPrim(prim_ot_take(2), p);
@@ -2059,6 +2087,7 @@ void psx_submit_frame_object(FrameObjectPartial *o, sint32 row_bucket)
         cell_sprite_light = object_shade;
         /* FUN_80094548 writes the current cell light into the source packet
            and FUN_8008DDEC copies that packet into the primitive arena. */
+#if defined(_DEBUG)
         if (getenv("OA_LIGHT_TRACE"))
         {
             static sint32 traced;
@@ -2073,6 +2102,7 @@ void psx_submit_frame_object(FrameObjectPartial *o, sint32 row_bucket)
                 traced++;
             }
         }
+#endif
         if (map_prim_count < 8192)
         {
             uint8 *copy = map_prims[map_prim_count++];
@@ -2142,6 +2172,7 @@ void psx_submit_cell_objects_remaining(sint32 cell_x, sint32 cell_z, sint32 row_
 
 static void log_floor_tile(const MAP_FLOOR_CELL *cell, const RV *q, const MapTextureSlot *s)
 {
+#if defined(_DEBUG)
     static uint32 seen;
     sint32 index, x, z, bit;
     FILE *f;
@@ -2163,6 +2194,7 @@ static void log_floor_tile(const MAP_FLOOR_CELL *cell, const RV *q, const MapTex
         fprintf(f, "z,x,tex,flags,x0,y0,u0,v0,x1,y1,u1,v1,x2,y2,u2,v2,x3,y3,u3,v3,tpage,clut\n");
     fprintf(f, "%d,%d,%u,%u,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%u,%u\n", z, x, cell->material, cell->flags, q[0].x, q[0].y, q[0].u, q[0].v, q[1].x, q[1].y, q[1].u, q[1].v, q[2].x, q[2].y, q[2].u, q[2].v, q[3].x, q[3].y, q[3].u, q[3].v, s->tpage, s->clut);
     fclose(f);
+#endif
 }
 
 void psx_draw_floor_tile(sint32 a, sint32 b, sint32 c, sint32 d, sint32 e, sint32 f, sint32 g, sint32 h, const MAP_FLOOR_CELL *cell, sint32 tile)
@@ -2242,26 +2274,27 @@ void psx_draw_floor_tile(sint32 a, sint32 b, sint32 c, sint32 d, sint32 e, sint3
     p = (POLY_FT4 *)map_prims[map_prim_count++];
     memset(p, 0, 40);
     p->tag = 0x09000000;
-    p->code = 0x2c;
-    p->r0 = p->g0 = p->b0 = (uint8)shade;
-    p->x0 = q[0].x;
-    p->y0 = q[0].y;
-    p->u0 = (uint8)q[0].u;
-    p->v0 = (uint8)q[0].v;
-    p->clut = s->clut;
-    p->x1 = q[1].x;
-    p->y1 = q[1].y;
-    p->u1 = (uint8)q[1].u;
-    p->v1 = (uint8)q[1].v;
-    p->tpage = s->tpage;
-    p->x2 = q[2].x;
-    p->y2 = q[2].y;
-    p->u2 = (uint8)q[2].u;
-    p->v2 = (uint8)q[2].v;
-    p->x3 = q[3].x;
-    p->y3 = q[3].y;
-    p->u3 = (uint8)q[3].u;
-    p->v3 = (uint8)q[3].v;
+    p->rgbc.code = 0x2c;
+    p->rgbc.r = p->rgbc.g = p->rgbc.b = (uint8)shade;
+    p->p[0].xy.x = q[0].x;
+    p->p[0].xy.y = q[0].y;
+    p->p[0].uv.u = (uint8)q[0].u;
+    p->p[0].uv.v = (uint8)q[0].v;
+    p->p[0].attr = s->clut;
+    p->p[1].xy.x = q[1].x;
+    p->p[1].xy.y = q[1].y;
+    p->p[1].uv.u = (uint8)q[1].u;
+    p->p[1].uv.v = (uint8)q[1].v;
+    p->p[1].attr = s->tpage;
+    p->p[2].xy.x = q[2].x;
+    p->p[2].xy.y = q[2].y;
+    p->p[2].uv.u = (uint8)q[2].u;
+    p->p[2].uv.v = (uint8)q[2].v;
+    p->p[3].xy.x = q[3].x;
+    p->p[3].xy.y = q[3].y;
+    p->p[3].uv.u = (uint8)q[3].u;
+    p->p[3].uv.v = (uint8)q[3].v;
+#if defined(_DEBUG)
     {
         const char *trace_name = getenv("OA_FLOOR_PACKET_TRACE");
         if (trace_name)
@@ -2296,6 +2329,7 @@ void psx_draw_floor_tile(sint32 a, sint32 b, sint32 c, sint32 d, sint32 e, sint3
             }
         }
     }
+#endif
     AddPrim(prim_ot_take(2), p);
 }
 

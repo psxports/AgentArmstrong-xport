@@ -96,7 +96,7 @@ void mini_gyro_update(MINI_GYRO *object)
 {
     MODEL_NODE *root = &object->nodes[0];
     const MINI_GYRO_DESCRIPTOR *d = object->descriptor;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         static sint32 seen;
         if (!seen && getenv("OA_STAGE21_TRACE") && object->collision.object_type == 117)
@@ -172,7 +172,7 @@ void mini_gyro_create(EFFECT *effect)
     cell_x = div_16384_trunc(object->collision.x);
     cell_z = div_16384_trunc(g_map_depth_cells * 0xc000 - object->collision.z);
     object->map_group = (MAP_MODEL_GROUP *)((uint8 *)g_map_model_groups + (uint32)g_map_floor_cells[cell_x + cell_z * g_map_width_cells].group_index * sizeof(MAP_MODEL_GROUP));
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (getenv("OA_STAGE21_TRACE"))
     {
         static sint32 count;

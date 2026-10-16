@@ -62,9 +62,9 @@ uint32 text_decode_sjis_glyph(uint16 code)
 static void set_text_color(SPRT *packet, uint32 index)
 {
     const uint8 *rgb = (const uint8 *)player_assets_executable_address(0x800c8438u + index * 3u);
-    packet->r0 = rgb[0];
-    packet->g0 = rgb[1];
-    packet->b0 = rgb[2];
+    packet->rgbc.r = rgb[0];
+    packet->rgbc.g = rgb[1];
+    packet->rgbc.b = rgb[2];
 }
 
 static void submit_font_mode(const FONT *font)
@@ -116,11 +116,11 @@ GDB_CALL void text_render(const char *source, sint32 initial_x, sint32 initial_y
     g_text_color_index = (sint16)(g_text_color_index * 3);
     packet.w = (sint16)g_font_glyph_width;
     packet.h = (sint16)g_font_glyph_height;
-    packet.x0 = (sint16)pen_x;
-    packet.y0 = (sint16)pen_y;
-    packet.u0 = (uint8)font->u0;
-    packet.v0 = (uint8)font->v1;
-    packet.clut = (uint16)g_font_clut;
+    packet.p[0].xy.x = (sint16)pen_x;
+    packet.p[0].xy.y = (sint16)pen_y;
+    packet.p[0].uv.u = (uint8)font->u0;
+    packet.p[0].uv.v = (uint8)font->v1;
+    packet.p[0].attr = (uint16)g_font_clut;
 
     for (;;)
     {
@@ -196,10 +196,10 @@ GDB_CALL void text_render(const char *source, sint32 initial_x, sint32 initial_y
             {
                 sint32 glyph = (sint16)code - 0x21;
                 SPRT *copy;
-                packet.v0 = (uint8)(font->v0 + (glyph / g_font_glyph_columns) * g_font_glyph_height);
-                packet.u0 = (uint8)(font->u0 + (glyph % g_font_glyph_columns) * g_font_glyph_width);
-                packet.x0 = (sint16)pen_x;
-                packet.y0 = (sint16)pen_y;
+                packet.p[0].uv.v = (uint8)(font->v0 + (glyph / g_font_glyph_columns) * g_font_glyph_height);
+                packet.p[0].uv.u = (uint8)(font->u0 + (glyph % g_font_glyph_columns) * g_font_glyph_width);
+                packet.p[0].xy.x = (sint16)pen_x;
+                packet.p[0].xy.y = (sint16)pen_y;
                 copy = (SPRT *)g_gpu_packet_cursor;
                 memcpy(copy, &packet, sizeof(packet));
                 psx_set_prim_screen_offset(160, 64);

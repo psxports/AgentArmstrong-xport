@@ -328,6 +328,7 @@ sint32 model_load(const void *source, sint32 size, sint32 count)
         if (cursor == 0)
             return 0;
     }
+#if defined(_DEBUG)
     if (getenv("OA_MODEL_TRACE"))
     {
         FILE *trace = xport_fopen("model_descriptors_port.csv", "w");
@@ -339,6 +340,7 @@ sint32 model_load(const void *source, sint32 size, sint32 count)
             fclose(trace);
         }
     }
+#endif
     return 1;
 }
 

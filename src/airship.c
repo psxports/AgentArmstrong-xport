@@ -174,7 +174,7 @@ void hierarchy_collision_box_update(void *object_value, MODEL_NODE *first_node, 
 /* Original: FUN_800AEA54. */
 void explosive_projectile_trail_update(PROJECTILE *projectile)
 {
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)
@@ -201,7 +201,7 @@ void explosive_projectile_trail_update(PROJECTILE *projectile)
 /* Original: FUN_800AEB08. */
 void explosive_projectile_impact(PROJECTILE *projectile)
 {
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     const char *airfield_trace = getenv("OA_AIRFIELD_TRACE");
     #define AIRFIELD_STEP(label) \
         do \
@@ -219,7 +219,7 @@ void explosive_projectile_impact(PROJECTILE *projectile)
 #else
     #define AIRFIELD_STEP(label) ((void)0)
 #endif
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     {
         const char *trace = getenv("OA_AIRFIELD_TRACE");
         if (trace && *trace)

@@ -114,7 +114,7 @@ static void tank_update(TANK_ACTOR *o)
     void *x;
     sint32 line[7], tx, tz, dx, dz, m, angle, depth;
     static sint32 traced;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (!traced && getenv("OA_STAGE23_TRACE"))
     {
         uint8 before = g_objective_counts[12];
@@ -306,7 +306,7 @@ void tank_create(EFFECT *e)
     o->movement_sound_handle = (sint16)sound_play_positional(0x64, 0, 0x7f, o->collision.x, o->collision.y, o->collision.z);
     o->acceleration = 3;
     hud_bar_initialize(g_boss_health_bar, -0x28, -0x60, 0x50, 0x258);
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (getenv("OA_STAGE23_TRACE"))
     {
         FILE *f = xport_fopen("../status/spank-the-tank-native.log", "w");

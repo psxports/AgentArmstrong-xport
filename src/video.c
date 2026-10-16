@@ -7,11 +7,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#if defined(XPORT_XCRT)
+    #include <windows.h>
+#endif
 
 #define VIDEO_RING_SECTORS 256u
 #define VIDEO_MAX_WIDTH 320u
 #define VIDEO_MAX_HEIGHT 240u
 #define VIDEO_TIMEOUT_FIELDS 300u
+
+#if defined(_DEBUG)
+    #define VIDEO_LOG(...) fprintf(stderr, __VA_ARGS__)
+#else
+    #define VIDEO_LOG(...) ((void)0)
+#endif
 
 const uint32 xport_gpu_graph_type_address = 0x800CEC20u;
 const uint32 xport_cd_ready_callback_address = 0x800D2DFCu;
@@ -25,6 +34,8 @@ static sint32 video_mount_str(const char *path)
     const char *source = path;
     char *destination = data_path;
     FILE *cue;
+    char cue_text[320];
+    sint32 cue_length;
     size_t remaining = sizeof(data_path);
     sint32 mounted;
     if (!path || !*path)
@@ -47,11 +58,20 @@ static sint32 video_mount_str(const char *path)
     cue = xport_fopen(cue_path, "w");
     if (!cue)
         return 0;
-    fprintf(cue, "FILE \"%s\" BINARY\n TRACK 01 MODE2/2352\n  INDEX 01 00:00:00\n", data_path);
+    cue_length = snprintf(cue_text, sizeof(cue_text), "FILE \"%s\" BINARY\n TRACK 01 MODE2/2352\n  INDEX 01 00:00:00\n", data_path);
+    if (cue_length < 0 || cue_length >= (sint32)sizeof(cue_text) || fwrite(cue_text, 1, (size_t)cue_length, cue) != (size_t)cue_length)
+    {
+        fclose(cue);
+        return 0;
+    }
     if (fclose(cue) != 0)
         return 0;
     mounted = cd_mount_cue(cue_path);
+#if defined(XPORT_XCRT)
+    DeleteFileA(cue_path);
+#else
     remove(cue_path);
+#endif
     return mounted;
 }
 
@@ -68,12 +88,12 @@ sint32 video_play_str(const char *path, sint32 expected_height, sint32 last_fram
     DecDCTCallback previous_in = NULL, previous_out = NULL;
     if (!video_mount_str(path))
     {
-        fprintf(stderr, "STR video: cannot mount %s\n", path ? path : "(null)");
+        VIDEO_LOG("STR video: cannot mount %s\n", path ? path : "(null)");
         return 0;
     }
     if (!CdInit())
     {
-        fprintf(stderr, "STR video: CD initialization failed for %s\n", path);
+        VIDEO_LOG("STR video: CD initialization failed for %s\n", path);
         cd_unmount_image();
         return 0;
     }
@@ -82,7 +102,7 @@ sint32 video_play_str(const char *path, sint32 expected_height, sint32 last_fram
     strip = (uint32 *)malloc(12u * VIDEO_MAX_HEIGHT * sizeof(uint32));
     if (!ring || !vlc || !strip)
     {
-        fprintf(stderr, "STR video: allocation failed\n");
+        VIDEO_LOG("STR video: allocation failed\n");
         goto cleanup;
     }
     previous_in = DecDCTinCallback(NULL);
@@ -97,10 +117,10 @@ sint32 video_play_str(const char *path, sint32 expected_height, sint32 last_fram
     CdIntToPos(0, &location);
     if (!CdControl(2u, (uint8 *)&location, NULL) || !CdRead2(read_mode))
     {
-        fprintf(stderr, "STR video: cannot start %s\n", path);
+        VIDEO_LOG("STR video: cannot start %s\n", path);
         goto cleanup;
     }
-    fprintf(stderr, "STR video: begin %s\n", path);
+    VIDEO_LOG("STR video: begin %s\n", path);
     while (!xport_isquit())
     {
         uint16 buttons;
@@ -110,7 +130,7 @@ sint32 video_play_str(const char *path, sint32 expected_height, sint32 last_fram
             VSync(0);
             if (++idle >= VIDEO_TIMEOUT_FIELDS)
             {
-                fprintf(stderr, "STR video: timeout after frame %u\n", decoded);
+                VIDEO_LOG("STR video: timeout after frame %u\n", decoded);
                 goto cleanup;
             }
             continue;
@@ -120,15 +140,15 @@ sint32 video_play_str(const char *path, sint32 expected_height, sint32 last_fram
         height = ((StHEADER *)raw_header)->height;
         if (!width || width > VIDEO_MAX_WIDTH || !height || height > VIDEO_MAX_HEIGHT || (width & 15u) || (height & 15u))
         {
-            fprintf(stderr, "STR video: unsupported frame %ux%u\n", width, height);
+            VIDEO_LOG("STR video: unsupported frame %ux%u\n", width, height);
             StFreeRing(frame);
             goto cleanup;
         }
         if (expected_height > 0 && height != (uint32)expected_height)
-            fprintf(stderr, "STR video: expected height %d, got %u\n", expected_height, height);
+            VIDEO_LOG("STR video: expected height %d, got %u\n", expected_height, height);
         if (DecDCTvlc(frame, vlc) != 0)
         {
-            fprintf(stderr, "STR video: malformed VLC frame %u\n", ((StHEADER *)raw_header)->frameCount);
+            VIDEO_LOG("STR video: malformed VLC frame %u\n", ((StHEADER *)raw_header)->frameCount);
             StFreeRing(frame);
             goto cleanup;
         }
@@ -177,6 +197,6 @@ cleanup:
     free(ring);
     SetDefDispEnv(&display, 0, 0, 320, 256);
     PutDispEnv(&display);
-    fprintf(stderr, "STR video: end %s at frame %u\n", path ? path : "(null)", decoded);
+    VIDEO_LOG("STR video: end %s at frame %u\n", path ? path : "(null)", decoded);
     return result;
 }

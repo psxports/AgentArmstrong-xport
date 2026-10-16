@@ -98,6 +98,8 @@ GDB_CALL sint32 cd_initialize(void)
         }
         --retries;
     } while (retries != -1);
+#if defined(_DEBUG)
     printf("CdInit: Init failed\n");
+#endif
     return 0;
 }

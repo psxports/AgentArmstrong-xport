@@ -3,3 +3,11 @@ _build/
 iso/
 tools/
 orig/
+
+/_build/
+/bin/
+/status/
+/tools/
+/orig/
+/iso/
+/.cursor/

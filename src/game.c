@@ -26,6 +26,7 @@
 #include "render.h"
 #include "resource_table.h"
 #include "runtime_heap.h"
+#include "save.h"
 #include "sprite.h"
 #include "stubs.h"
 #include "text_renderer.h"
@@ -76,11 +77,11 @@
 /* set to 800709FC */
 /* Originals: DAT_800EA6C8, DAT_800EA6CC, DAT_800EA6CD, DAT_800EA6CE,
  * DAT_800ED8B8.  The three color labels are embedded POLY_FT4 fields. */
-#define g_shared_quad_prim_red (g_shared_quad_prim.r0)
+#define g_shared_quad_prim_red (g_shared_quad_prim.rgbc.r)
 
-#define g_shared_quad_prim_green (g_shared_quad_prim.g0)
+#define g_shared_quad_prim_green (g_shared_quad_prim.rgbc.g)
 
-#define g_shared_quad_prim_blue (g_shared_quad_prim.b0)
+#define g_shared_quad_prim_blue (g_shared_quad_prim.rgbc.b)
 
 #define STAGE_HUB 0
 
@@ -187,6 +188,7 @@ GDB_CALL sint32 boot_language_text_load(void)
 
 static void mission_launch_trace(const char *event)
 {
+#if defined(_DEBUG)
     FILE *trace;
     if (getenv("OA_MISSION_LAUNCH_TRACE") == 0)
         return;
@@ -195,13 +197,13 @@ static void mission_launch_trace(const char *event)
         return;
     fprintf(trace, "%s stage=%d next=%d mode=%d env=%p player=%p\n", event, g_stage_index, g_next_stage_index, g_input_recording_mode, (void *)g_stage_env, g_player);
     fclose(trace);
+#endif
 }
 
-static int game_main(int argc, char **argv)
+static int game_main(void)
 {
     uint32 packed;
     uint16 *env;
-    uint16 tpage;
     sint32 musicId;
     char *strPath;
     sint32 strFrames;
@@ -210,7 +212,9 @@ static int game_main(int argc, char **argv)
 
     if (!ot_depth_run_self_tests())
     {
+#if defined(_DEBUG)
         fprintf(stderr, "OT depth arithmetic self-test failed\n");
+#endif
         return 2;
     }
     g_initial_stack_pointer = 0; /* PSX stack snapshot has no native equivalent */
@@ -236,8 +240,11 @@ static int game_main(int argc, char **argv)
     g_vertical_cull_extent = 0x80;
     g_display_screen_y = 0x15;
     video_mode_set(1);
+#if 0 /* Startup warning is disabled */
     startup_warning_show();
+#endif
     hq_world_map_relocate_nodes();
+    game_progress_load();
 #if LEVEL_SELECT
     level_select_unlock_all();
 #endif
@@ -253,14 +260,16 @@ static int game_main(int argc, char **argv)
     {
         const char *start_stage = getenv("OA_START_STAGE");
         if (start_stage != 0)
-            g_next_stage_index = (sint32)strtol(start_stage, 0, 0) + 1;
+            g_next_stage_index = (sint32)strtoul(start_stage, 0, 0) + 1;
     }
 
     /* Session loop: FMV / load / run / tear down sound, then restart. */
     while (!xport_isquit())
     {
         g_iterations += 1;
+#if defined(_DEBUG)
         printf("**** ITERATIONS = %d ****\n", g_iterations);
+#endif
 
         ResetCallback();
         runtime_heap_initialize();
@@ -451,9 +460,13 @@ static int game_main(int argc, char **argv)
             resource_table_register(0x25000, archive_member_find("MAP0004.BIN", g_stage_archive));
             resource_table_register(0x25400, archive_member_find("MAP0005.BIN", g_stage_archive));
             resource_table_register(0x25800, archive_member_find("MAP0006.BIN", g_stage_archive));
+#if 0 /* Native save/load uses xport_save and xport_load */
             sprite_archive_resource_load("CARDICON.BIN", 0x27000, 3, 0, g_stage_archive);
-            tpage = sprite_clut_upload(0x27000, 0, 0, 0);
-            sprite_assign_clut_range(0x27000, 3, tpage);
+            {
+                uint16 tpage = sprite_clut_upload(0x27000, 0, 0, 0);
+                sprite_assign_clut_range(0x27000, 3, tpage);
+            }
+#endif
             effects_spawn_initial();
             hq_level_update();
             if (xport_isquit())
@@ -553,5 +566,5 @@ static int game_main(int argc, char **argv)
 // XPORT REVISION: 2026-09-29T20:00:00Z
 void xport_main(void)
 {
-    xport_set_exit_code(game_main(xport_arg_count(), xport_arg_values()));
+    xport_set_exit_code(game_main());
 }

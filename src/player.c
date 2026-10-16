@@ -382,7 +382,7 @@ void player_hit_flash_update(void *player_value)
     if (player->flash_clut_ticks != 0)
     {
         player->flash_clut_ticks = (sint16)(player->flash_clut_ticks - 1);
-        player->prim.clut = g_hit_flash_clut;
+        player->prim.p[0].attr = g_hit_flash_clut;
     }
 }
 
@@ -443,9 +443,6 @@ static void player_particle_ring_update(PLAYER_PARTICLE_RING *object)
     /* 0x800943F0..0x800944BC computes these values but contains no store or
      * draw call; retain the original arithmetic while documenting that its
     * results are dead in the PAL executable. */
-    (void)map_span;
-    (void)point_x;
-    (void)point_z;
     phase = object->phase + 1;
     object->phase = phase;
     if (phase == object->frames_per_ring)
@@ -1249,7 +1246,7 @@ void player_continuous_weapon_update(PLAYER *player)
         g_next_frame_object->force_light = 1;
         render_world_sprite(0x28400, x, y, z, 1, scale, scale, &g_continuous_weapon_effect_prim, 0, 2, 0, g_continuous_weapon_effect_rotation);
         player->light_delta = (sint16)random_range(0x7f);
-        g_continuous_weapon_effect_prim.clut = clut;
+        g_continuous_weapon_effect_prim.p[0].attr = clut;
     }
     else
     {
@@ -1381,28 +1378,28 @@ static void menu_backdrop(sint32 left, sint32 top, sint32 width, sint32 height)
     sint32 y0 = top - g_screen_height / 2 + 0x41;
     sint32 y1 = y0 + height - 2;
     SetPolyG4(&gradient);
-    gradient.r0 = 0x78;
-    gradient.g0 = 0;
-    gradient.b0 = 0;
-    gradient.r1 = 0x78;
-    gradient.g1 = 0x3c;
-    gradient.b1 = 0;
-    gradient.r2 = 0x78;
-    gradient.g2 = 0x3c;
-    gradient.b2 = 0;
-    gradient.r3 = 0xff;
-    gradient.g3 = 0xff;
-    gradient.b3 = 0;
-    gradient.x0 = gradient.x2 = (sint16)(left + 1);
-    gradient.x1 = gradient.x3 = (sint16)(left + width - 1);
-    gradient.y0 = gradient.y1 = (sint16)y0;
-    gradient.y2 = gradient.y3 = (sint16)y1;
+    gradient.p[0].rgbc.r = 0x78;
+    gradient.p[0].rgbc.g = 0;
+    gradient.p[0].rgbc.b = 0;
+    gradient.p[1].rgbc.r = 0x78;
+    gradient.p[1].rgbc.g = 0x3c;
+    gradient.p[1].rgbc.b = 0;
+    gradient.p[2].rgbc.r = 0x78;
+    gradient.p[2].rgbc.g = 0x3c;
+    gradient.p[2].rgbc.b = 0;
+    gradient.p[3].rgbc.r = 0xff;
+    gradient.p[3].rgbc.g = 0xff;
+    gradient.p[3].rgbc.b = 0;
+    gradient.p[0].xy.x = gradient.p[2].xy.x = (sint16)(left + 1);
+    gradient.p[1].xy.x = gradient.p[3].xy.x = (sint16)(left + width - 1);
+    gradient.p[0].xy.y = gradient.p[1].xy.y = (sint16)y0;
+    gradient.p[2].xy.y = gradient.p[3].xy.y = (sint16)y1;
     SetPolyF4(&black);
-    black.r0 = black.g0 = black.b0 = 0;
-    black.x0 = black.x2 = (sint16)left;
-    black.x1 = black.x3 = (sint16)(left + width - 1);
-    black.y0 = black.y1 = (sint16)(y0 - 1);
-    black.y2 = black.y3 = (sint16)(y1 + 1);
+    black.rgbc.r = black.rgbc.g = black.rgbc.b = 0;
+    black.p[0].x = black.p[2].x = (sint16)left;
+    black.p[1].x = black.p[3].x = (sint16)(left + width - 1);
+    black.p[0].y = black.p[1].y = (sint16)(y0 - 1);
+    black.p[2].y = black.p[3].y = (sint16)(y1 + 1);
     gradient_copy = (POLY_G4 *)g_gpu_packet_cursor;
     memcpy(gradient_copy, &gradient, sizeof(gradient));
     g_gpu_packet_cursor += sizeof(gradient);
@@ -1547,7 +1544,7 @@ GDB_CALL sint16 menu_run(void *raw_entries, sint32 x, sint32 y)
                 SPRT *icon = render_screen_sprite((sint16)(left + g_font_glyph_width * 3), (sint16)row, (uint32)entry->value_or_list, 0);
                 row += 12;
                 if (x == g_menu_selection_index)
-                    icon->r0 = icon->g0 = icon->b0 = (uint8)(frame * 8);
+                    icon->rgbc.r = icon->rgbc.g = icon->rgbc.b = (uint8)(frame * 8);
                 continue;
             }
             if (x == g_menu_selection_index && (frame & 8) != 0)
@@ -3096,7 +3093,11 @@ void player_assets_runtime_initialize(void)
 void level_select_unlock_all(void)
 {
     uint8 *record = (uint8 *)player_assets_executable_address(0x800c28e4u);
+#if defined(_DEBUG)
     g_level_select_cheat_enabled = 1;
+#else
+    // g_level_select_cheat_enabled = 1; // all levels cheat
+#endif
     while (*(sint16 *)record != -1)
     {
         if (*(sint16 *)record < 0x40)
@@ -3284,7 +3285,7 @@ void player_action_effect_create(EFFECT *effect)
     PLAYER_ACTION *object = player_action_object_create(effect->x, effect->y, effect->z, source_type);
     object->owner_effect = effect;
     effect->type = 0;
-#ifdef XPORT_NATIVE
+#if defined(XPORT_NATIVE) && defined(_DEBUG)
     if (g_stage_index == 29 && getenv("OA_STAGE29_TRACE") && (source_type == 0x89 || source_type == 0x8c))
     {
         FILE *f = xport_fopen("../status/chemical-vats-native.log", source_type == 0x89 ? "w" : "a");
@@ -3576,9 +3577,9 @@ void player_mission_complete_update(void *player_value)
         strcpy(text, source);
         completed = mission_objective_counts() & 0xffff;
         marker = strchr(text, '&');
-        sprintf(number, "%d", completed);
+        snprintf(number, sizeof(number), "%d", completed);
         marker[0] = number[0];
-        sprintf(number, "%d", g_secondary_objective_count);
+        snprintf(number, sizeof(number), "%d", g_secondary_objective_count);
         marker[2] = number[0];
         record = mission_record_find_by_stage((sint16)g_stage_index);
         next_stage = record->next_connection;
