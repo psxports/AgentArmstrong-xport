@@ -7,8 +7,10 @@
 #include "mission.h"
 #include "render.h"
 
+extern const char g_loading_caption_spanish[];
+GDB_CALL const char *loading_image_next_path(void);
+
 /* BEGIN GENERATED MODULE API */
-GDB_CALL DISPENV *display_env_apply(DISPENV *env);
 GDB_CALL void loading_caption_show(const char *text);
 GDB_CALL void loading_image_show(const char *path, const char *text);
 GDB_CALL void startup_warning_show(void);

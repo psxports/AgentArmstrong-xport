@@ -9,6 +9,7 @@
 GDB_CALL void *runtime_heap_allocate(sint32 size);
 GDB_CALL void *runtime_heap_allocate_sector_aligned(sint32 size);
 GDB_CALL void *runtime_heap_initialize(void);
+void runtime_heap_release(void);
 GDB_CALL void runtime_heap_defer_free(void *pointer);
 GDB_CALL void runtime_heap_sweep(void);
 void *runtime_heap_allocate_best_fit(sint32 size);

@@ -1,73 +1,55 @@
 #include <string.h>
-#include "global.h"
+
 #include "cc_archive.h"
-#include "original_file.h"
-#include "game_file.h"
+#include "xport_trace.h"
+#include "resource_table.h"
 
-/* Variables. */
-static uint8 *archive_data;
-
-static sint32 archive_size;
-
-static CC_ARCHIVE_ENTRY *archive_entries;
-
-static sint32 archive_entry_count;
-
-/* Functions. */
-static sint32 valid_range(sint32 offset, sint32 size)
+/* Validate serialized CC directory entries before resolving native references */
+sint32 archive_validate(const void *data, sint32 size)
 {
-    return offset >= 0 && size >= 0 && (sint32)offset <= archive_size && (sint32)size <= archive_size - (sint32)offset;
-}
-
-void cc_archive_close(void)
-{
-    app_file_free(archive_data);
-    archive_data = 0;
-    archive_size = 0;
-    archive_entries = 0;
-    archive_entry_count = 0;
-}
-
-sint32 cc_archive_open(const char *path)
-{
-    CC_ARCHIVE_HEADER *header;
-    sint32 count;
-    cc_archive_close();
-    archive_data = (uint8 *)game_file_load(path, &archive_size);
-    if (archive_data == 0 || archive_size < 16)
+    const uint8 *bytes = (const uint8 *)data;
+    uint32 count, idx;
+    if (bytes == 0 || size < 16)
         return 0;
-
-    header = (CC_ARCHIVE_HEADER *)archive_data;
-    count = header->entry_count;
-    if (count < 0 || count > 1024 || count > (archive_size - (sint32)sizeof(*header)) / (sint32)sizeof(CC_ARCHIVE_ENTRY))
+    uint32 capacity = size;
+    count = xport_load_le32(bytes + 12);
+    if (count > (capacity - 16) / 24)
+        return 0;
+    for (idx = 0; idx < count; ++idx)
     {
-        cc_archive_close();
-        return 0;
+        const uint8 *entry = bytes + 16 + idx * 24;
+        uint32 offset = xport_load_le32(entry + 16);
+        uint32 len = xport_load_le32(entry + 20);
+        if (memchr(entry, 0, 16) == 0 || offset > capacity || len > capacity - offset)
+            return 0;
     }
-    archive_entry_count = count;
-    archive_entries = (CC_ARCHIVE_ENTRY *)(header + 1);
     return 1;
 }
 
-void *cc_archive_data(void)
+/* Original: SLES_004.74:FUN_800A6ABC. */
+GDB_CALL RESOURCE_DATA archive_member_find(const char *name, const void *data, sint32 size)
 {
-    return archive_data;
+    const uint8 *bytes = (const uint8 *)data;
+    uint32 count, idx;
+    RESOURCE_DATA member = {0, 0};
+    if (name == 0 || !archive_validate(data, size))
+        return member;
+    count = xport_load_le32(bytes + 12);
+    for (idx = 0; idx < count; ++idx)
+    {
+        const uint8 *entry = bytes + 16 + idx * 24;
+        if (strcmp(name, (const char *)entry) != 0)
+            continue;
+        member.data = (uint8 *)data + xport_load_le32(entry + 16);
+        member.size = xport_load_le32(entry + 20);
+        return member;
+    }
+    return member;
 }
 
-void *cc_archive_find(const char *name, sint32 *size_out)
+/* Original: SLES_004.74:FUN_800A6A0C. */
+void archive_resource_register(const char *name, uint32 resource, const void *archive, sint32 size)
 {
-    sint32 i;
-    for (i = 0; i < archive_entry_count; ++i)
-    {
-        CC_ARCHIVE_ENTRY *entry = archive_entries + i;
-        if (strncmp(entry->name, name, sizeof(entry->name)) == 0 && valid_range(entry->offset, entry->size))
-        {
-            if (size_out != 0)
-                *size_out = (sint32)entry->size;
-            return archive_data + entry->offset;
-        }
-    }
-    if (size_out != 0)
-        *size_out = 0;
-    return 0;
+    RESOURCE_DATA member = archive_member_find(name, archive, size);
+    resource_table_register(resource, member.data, member.size, RESOURCE_COPY);
 }

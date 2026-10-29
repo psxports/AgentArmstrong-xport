@@ -11,7 +11,7 @@
 
 /* BEGIN GENERATED MODULE API */
 void bio_goo_create(EFFECT *e);
-void industry_gun_controller_create(EFFECT *effect);
+void industry_gun_create(EFFECT *effect);
 void robot_press_create(EFFECT *e);
 /* END GENERATED MODULE API */
 

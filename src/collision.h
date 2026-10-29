@@ -5,100 +5,104 @@
 
 #include "xport.h"
 #include "psx.h"
+#include "object.h"
+
+struct VRAM_SPRITE;
+struct MODEL_NODE;
 
 /* Types. */
-typedef void (*FUNC_COLLISION_UPDATE)(void *object);
-typedef void (*FUNC_COLLISION_CALLBACK)(void *object, void *source);
+typedef void (*FUNC_COLLISION_CALLBACK)(void *object, void *src);
+typedef void *(*FUNC_COLLISION_OBJECT_CALLBACK)(void *object, void *src);
 
-/* Common object prefix consumed by FUN_80098588/FUN_8009875C.  Concrete
- * actor/effect allocations extend this prefix with type-specific storage. */
+typedef enum
+{
+    COLLISION_CALLBACK_NOTIFY,
+    COLLISION_CALLBACK_OBJECT
+} COLLISION_CALLBACK_KIND;
+
+/* Native collision prefix shared by actors and effects */
 typedef struct
 {
-    void *previous;                      /* +0x00 */
-    void *next;                          /* +0x04 */
-    uint32 field_08;                     /* +0x08 */
-    FUNC_COLLISION_UPDATE update;        /* +0x0C */
-    FUNC_COLLISION_CALLBACK callback_10; /* +0x10 */
-    FUNC_COLLISION_CALLBACK callback_14; /* +0x14 */
-    FUNC_COLLISION_CALLBACK callback_18; /* +0x18 */
-    sint16 object_type;                  /* +0x1C */
-    uint16 field_1e;                     /* +0x1E */
-    sint32 x, y, z;                      /* +0x20..+0x28 */
-    sint32 box_x, box_y, box_z;          /* +0x2C..+0x34 */
-    sint32 width, height, depth;         /* +0x38..+0x40 */
-    uint8 prim[0x28];                    /* +0x44, POLY_FT4 packet bytes */
-    void *frame_descriptor;              /* +0x6C */
-    uint32 receives_mask;                /* +0x70 */
-    uint32 sends_mask;                   /* +0x74 */
+    OBJECT object;
+    /* Player contact includes damage, pickups and scripted interaction */
+    FUNC_COLLISION_CALLBACK player_contact_callback;
+    /* Hits include projectiles, explosions and damaging particles */
+    COLLISION_CALLBACK_KIND hit_callback_kind;
+
+    union
+    {
+        FUNC_COLLISION_CALLBACK hit_callback;
+        FUNC_COLLISION_OBJECT_CALLBACK hit_object_callback;
+    };
+
+    sint16 object_type;
+    sint32 x, y, z;
+    sint32 box_x, box_y, box_z;
+    sint32 width, height, depth;
+    POLY_FT4 prim;
+    struct VRAM_SPRITE *frame_desc;
+    uint32 receives_mask;
+    uint32 sends_mask;
+
+    union
+    {
+        sint16 health;
+        sint16 damage;
+    } hit;
+
+    sint16 flash_clut_ticks;
 } COLLISION;
 
-typedef void (*COLLISION_CALLBACK)(COLLISION *object, COLLISION *source);
-
 typedef struct
 {
-    sint32 x;     /* +0x00 */
-    sint32 y;     /* +0x04 */
-    sint32 z;     /* +0x08 */
-    sint32 flags; /* +0x0C */
-    sint32 step;  /* +0x10 */
+    sint32 x;     /* Legacy +0x00 */
+    sint32 y;     /* Legacy +0x04 */
+    sint32 z;     /* Legacy +0x08 */
+    sint32 flags; /* Legacy +0x0C */
+    sint32 step;  /* Legacy +0x10 */
 } COLLISION_RESULT;
 
-#if defined(AP_32BIT)
-    #define COLLISION_OFFSET_ASSERT(field, offset) typedef char CollisionObject_##field##_at_##offset[(offsetof(COLLISION, field) == 0x##offset) ? 1 : -1]
-COLLISION_OFFSET_ASSERT(update, 0c);
-COLLISION_OFFSET_ASSERT(callback_14, 14);
-COLLISION_OFFSET_ASSERT(callback_18, 18);
-COLLISION_OFFSET_ASSERT(object_type, 1c);
-COLLISION_OFFSET_ASSERT(x, 20);
-COLLISION_OFFSET_ASSERT(box_x, 2c);
-COLLISION_OFFSET_ASSERT(width, 38);
-COLLISION_OFFSET_ASSERT(prim, 44);
-COLLISION_OFFSET_ASSERT(frame_descriptor, 6c);
-COLLISION_OFFSET_ASSERT(receives_mask, 70);
-COLLISION_OFFSET_ASSERT(sends_mask, 74);
-    #undef COLLISION_OFFSET_ASSERT
-#endif
-typedef char CollisionResult_size_14[(sizeof(COLLISION_RESULT) == 0x14) ? 1 : -1];
-
 /* Types. */
-typedef struct
+typedef struct DYNAMIC_COLLISION_NODE
 {
-    void *previous; /* +0x00 */
-    void *next;     /* +0x04 */
-    uint8 field_08[8];
-    sint32 top_y;    /* +0x10 */
-    sint32 bottom_y; /* +0x14 */
-    uint8 field_18[8];
-    sint32 min_x; /* +0x20 */
-    uint8 field_24[4];
-    sint32 max_x; /* +0x28 */
-    uint8 field_2c[12];
-    sint32 min_z;     /* +0x38 */
-    sint32 max_z;     /* +0x3C */
-    sint16 attribute; /* +0x40 */
-    uint8 field_42[2];
+    struct DYNAMIC_COLLISION_NODE *prev, *next;
+    sint32 top_y, bottom_y;
+    sint32 min_x, max_x, min_z, max_z;
+    sint16 attribute;
 } DYNAMIC_COLLISION_NODE;
 
-typedef char DynamicCollisionNode_size_44[sizeof(DYNAMIC_COLLISION_NODE) == 0x44 ? 1 : -1];
+typedef struct
+{
+    DYNAMIC_COLLISION_NODE *head, *tail;
+} DYNAMIC_COLLISION_ANCHOR;
+
+typedef struct DYNAMIC_COLLISION_GRID
+{
+    DYNAMIC_COLLISION_ANCHOR *cells;
+    sint32 count;
+} DYNAMIC_COLLISION_GRID;
+
+extern DYNAMIC_COLLISION_GRID g_dynamic_col_grid;
+extern sint32 g_col_surface_resource;
+void col_heap_reset(void);
 
 /* Types. */
 /* Common prefix consumed by resident flash-palette helper FUN_80096B58. */
-typedef struct
-{
-    COLLISION collision;     /* +0x00 */
-    sint16 field_78;         /* +0x78 */
-    sint16 flash_clut_ticks; /* +0x7A */
-} FLASHABLE;
-
-#if defined(AP_32BIT)
-typedef char FlashableObject_size_7c[sizeof(FLASHABLE) == 0x7c ? 1 : -1];
-typedef char FlashableObject_ticks_at_7a[offsetof(FLASHABLE, flash_clut_ticks) == 0x7a ? 1 : -1];
-#endif
 
 /* BEGIN GENERATED MODULE API */
-GDB_CALL void collision_box_set(void *object_value, sint32 width, sint32 height, sint32 depth);
-sint16 object_damage_apply(void *target_value, void *source_value);
-void object_collisions_dispatch(void);
+void hierarchy_col_box_update(COLLISION *object, const struct MODEL_NODE *first_node, sint16 count);
+GDB_CALL void col_box_set(void *object_val, sint32 width, sint32 height, sint32 depth);
+sint16 object_damage_apply(void *target_val, void *src_val);
+sint16 swept_col_test(sint32 old_x, sint32 old_y, sint32 old_z, sint32 *new_x, sint32 *new_y, sint32 *new_z);
+void object_cols_dispatch(void);
 /* END GENERATED MODULE API */
+
+extern COLLISION_RESULT *g_cur_col_result;
+extern sint32 g_col_flags, g_dynamic_col_hit;
+
+COLLISION_RESULT *static_map_col_resolve(sint32 old_x, sint32 old_y, sint32 old_z, sint32 new_x, sint32 new_y, sint32 new_z, sint32 width, sint32 height, sint32 depth);
+uint32 map_motion_resolve(sint32 old_x, sint32 old_y, sint32 old_z, sint32 *x, sint32 *y, sint32 *z, sint32 *velocity_x, sint32 *velocity_y, sint32 width, sint32 height, sint32 depth);
+
+sint16 map_environment_damage_test(sint32 world_x, sint32 world_y, sint32 world_z, sint32 width, sint32 height, sint32 depth);
 
 #endif

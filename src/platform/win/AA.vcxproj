@@ -77,9 +77,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4100;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4146;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>GAPI_OGL;XPORT_NATIVE;XPORT_ENABLE_AUDIT;XPORT_MEMORY_DIAGNOSTICS;_CRT_SECURE_NO_WARNINGS;FULL_NAME="Agent Armstrong";WND_TITLE="Agent Armstrong (xport)";WND_WIDTH=960;WND_HEIGHT=720;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GAPI_OGL;XPORT_NATIVE;XPORT_SPU_WRITE_MAX_BYTES=0x7eff0u;XPORT_ENABLE_AUDIT;XPORT_MEMORY_DIAGNOSTICS;_CRT_SECURE_NO_WARNINGS;FULL_NAME="Agent Armstrong";WND_TITLE="Agent Armstrong (xport)";WND_WIDTH=960;WND_HEIGHT=720;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>Disabled</Optimization>
       <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
@@ -102,9 +102,9 @@
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
-      <DisableSpecificWarnings>4100;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4146;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <SDLCheck>false</SDLCheck>
-      <PreprocessorDefinitions>GAPI_OGL;XPORT_NATIVE;_CRT_SECURE_NO_WARNINGS;FULL_NAME="Agent Armstrong";WND_TITLE="Agent Armstrong (xport)";WND_WIDTH=960;WND_HEIGHT=720;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>GAPI_OGL;XPORT_NATIVE;XPORT_SPU_WRITE_MAX_BYTES=0x7eff0u;_CRT_SECURE_NO_WARNINGS;FULL_NAME="Agent Armstrong";WND_TITLE="Agent Armstrong (xport)";WND_WIDTH=960;WND_HEIGHT=720;FIELD_RATE=50;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..;$(ProjectDir);$(ProjectDir)..\..\..\..\xport\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <Optimization>MinSpace</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
@@ -129,7 +129,7 @@
       <ImportLibrary>$(IntDir)AA.lib</ImportLibrary>
       <AdditionalDependencies>opengl32.lib;user32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <FixedBaseAddress>true</FixedBaseAddress>
-      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <ImageHasSafeExceptionHandlers Condition="'$(Platform)'=='Win32'">false</ImageHasSafeExceptionHandlers>
       <GenerateManifest>false</GenerateManifest>
       <DataExecutionPrevention>true</DataExecutionPrevention>
     </Link>
@@ -158,8 +158,10 @@
     <ClCompile Include="..\..\..\..\xport\src\psx_press.c" />
     <ClCompile Include="..\..\..\..\xport\src\psx_vlc.c" />
     <ClCompile Include="..\..\..\..\xport\src\psx_stream.c" />
+    <ClCompile Include="..\..\..\..\xport\src\xport_fmv.c" />
     <ClCompile Include="..\..\..\..\xport\src\xport_trace.c" />
     <ClCompile Include="..\..\game_sound.c" />
+    <ClCompile Include="..\..\menu.c" />
     <ClCompile Include="..\..\animation.c" />
     <ClCompile Include="..\..\industry.c" />
     <ClCompile Include="..\..\radar_death.c" />
@@ -171,7 +173,7 @@
     <ClCompile Include="..\..\collision.c" />
     <ClCompile Include="..\..\effect_update.c" />
     <ClCompile Include="..\..\game_loop.c" />
-    <ClCompile Include="..\..\global.c" />
+    <ClCompile Include="..\..\game_math.c" />
     <ClCompile Include="..\..\render.c" />
     <ClCompile Include="..\..\sprite.c" />
     <ClCompile Include="..\..\v2.c" />
@@ -180,30 +182,27 @@
     <ClCompile Include="..\..\projectile.c" />
     <ClCompile Include="..\..\spatial.c" />
     <ClCompile Include="..\..\map.c" />
+    <ClCompile Include="..\..\map_render.c" />
     <ClCompile Include="..\..\object.c" />
     <ClCompile Include="..\..\mission.c" />
     <ClCompile Include="..\..\hq.c" />
     <ClCompile Include="..\..\airship.c" />
-    <ClCompile Include="..\..\memory_card_platform.c" />
+    <ClCompile Include="..\..\mechanism.c" />
     <ClCompile Include="..\..\input_record.c" />
     <ClCompile Include="..\..\level_data.c" />
     <ClCompile Include="..\..\game.c" />
     <ClCompile Include="..\..\mechanoid.c" />
     <ClCompile Include="..\..\model.c" />
-    <ClCompile Include="..\..\original_file.c" />
-    <ClCompile Include="..\..\original_tables.c" />
     <ClCompile Include="..\..\random.c" />
     <ClCompile Include="..\..\resource_table.c" />
+    <ClCompile Include="..\..\resource_script.c" />
     <ClCompile Include="..\..\scuba_player.c" />
     <ClCompile Include="..\..\runtime_heap.c" />
     <ClCompile Include="..\..\save.c" />
-    <ClCompile Include="..\..\stubs.c" />
-    <ClCompile Include="..\..\cd.c" />
     <ClCompile Include="..\..\text_renderer.c" />
     <ClCompile Include="..\..\tank.c" />
     <ClCompile Include="..\..\gyro.c" />
     <ClCompile Include="..\..\gunship.c" />
-    <ClCompile Include="..\..\vram_alloc.c" />
     <ClCompile Include="..\..\input.c" />
     <ClCompile Include="..\..\game_file.c" />
     <ClCompile Include="..\..\game_runtime.c" />
@@ -212,14 +211,17 @@
   <ItemGroup>
     </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\game_math.h" />
+    <ClInclude Include="..\..\native_config.h" />
     <ClInclude Include="..\..\animation.h" />
+    <ClInclude Include="..\..\resource_script.h" />
     <ClInclude Include="..\..\airship.h" />
+    <ClInclude Include="..\..\mechanism.h" />
+    <ClInclude Include="..\..\map_render.h" />
     <ClInclude Include="..\..\cc_archive.h" />
-    <ClInclude Include="..\..\cd.h" />
     <ClInclude Include="..\..\code_module.h" />
     <ClInclude Include="..\..\model.h" />
     <ClInclude Include="..\..\mechanoid.h" />
-    <ClInclude Include="..\..\original_tables.h" />
     <ClInclude Include="..\..\..\..\xport\src\xport.h" />
     <ClInclude Include="..\..\..\..\xport\src\psx.h" />
     <ClInclude Include="..\..\..\..\xport\src\psx_gpu.h" />
@@ -239,18 +241,20 @@
   <PropertyGroup Label="XportTemplateSync">
     <UseXcrt Condition="'$(UseXcrt)'==''">true</UseXcrt>
     <XcrtEnabled>false</XcrtEnabled>
-    <XcrtEnabled Condition="'$(Configuration)|$(Platform)'=='Release|Win32' and '$(UseXcrt)'=='true' and '$(LockstepDebug)'!='true'">true</XcrtEnabled>
+    <XcrtEnabled Condition="'$(Configuration)'=='Release' and '$(UseXcrt)'=='true' and '$(LockstepDebug)'!='true'">true</XcrtEnabled>
+    <NativeArch Condition="'$(Platform)'=='Win32'">x86</NativeArch>
+    <NativeArch Condition="'$(Platform)'=='x64'">x64</NativeArch>
     <OutDir>$(ProjectDir)..\..\..\bin\</OutDir>
-    <IntDir>$(ProjectDir)..\..\..\_build\x86\$(Configuration)\</IntDir>
+    <IntDir>$(ProjectDir)..\..\..\_build\$(NativeArch)\$(Configuration)\</IntDir>
     <LinkIncremental>false</LinkIncremental>
     <LocalDebuggerWorkingDirectory>$(OutDir)</LocalDebuggerWorkingDirectory>
     <LocalDebuggerCommand>$(TargetPath)</LocalDebuggerCommand>
     <DebuggerFlavor>WindowsLocalDebugger</DebuggerFlavor>
   </PropertyGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="XportTemplateSync">
+  <PropertyGroup Condition="'$(Configuration)'=='Debug'" Label="XportTemplateSync">
     <TargetName>AA_debug</TargetName>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="XportTemplateSync">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Debug'" Label="XportTemplateSync">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -260,7 +264,7 @@
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <ProgramDataBaseFileName>$(IntDir)AA-compile.pdb</ProgramDataBaseFileName>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
-      <DisableSpecificWarnings>4100;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4146;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PreprocessorDefinitions>GAPI_OGL;_DEBUG;XPORT_ENABLE_AUDIT;XPORT_MEMORY_DIAGNOSTICS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
     <Link>
@@ -271,12 +275,12 @@
       <AdditionalDependencies>opengl32.lib;user32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="XportTemplateSync">
+  <PropertyGroup Condition="'$(Configuration)'=='Release'" Label="XportTemplateSync">
     <TargetName>AA</TargetName>
     <GenerateManifest>false</GenerateManifest>
     <WholeProgramOptimization>true</WholeProgramOptimization>
   </PropertyGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="XportTemplateSync">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release'" Label="XportTemplateSync">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
       <TreatWarningAsError>true</TreatWarningAsError>
@@ -292,7 +296,7 @@
       <OmitFramePointers>true</OmitFramePointers>
       <RuntimeTypeInfo>false</RuntimeTypeInfo>
       <ControlFlowGuard>false</ControlFlowGuard>
-      <DisableSpecificWarnings>4100;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings>4100;4146;4244;4554;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <PreprocessorDefinitions>GAPI_OGL;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DebugInformationFormat>None</DebugInformationFormat>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
@@ -305,13 +309,13 @@
       <OptimizeReferences>true</OptimizeReferences>
       <RandomizedBaseAddress>false</RandomizedBaseAddress>
       <FixedBaseAddress>true</FixedBaseAddress>
-      <ImageHasSafeExceptionHandlers>false</ImageHasSafeExceptionHandlers>
+      <ImageHasSafeExceptionHandlers Condition="'$(Platform)'=='Win32'">false</ImageHasSafeExceptionHandlers>
       <GenerateManifest>false</GenerateManifest>
       <DataExecutionPrevention>true</DataExecutionPrevention>
       <AdditionalDependencies>opengl32.lib;user32.lib;gdi32.lib;winmm.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
-  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32' and '$(LockstepDebug)'!='true'" Label="XportTemplateSync">
+  <ItemDefinitionGroup Condition="'$(Configuration)'=='Release' and '$(LockstepDebug)'!='true'" Label="XportTemplateSync">
     <ClCompile>
       <PreprocessorDefinitions>XPORT_DISABLE_FUNCTION_MARKERS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -345,8 +349,23 @@
     <MASM Include="..\..\..\..\xport\src\platform\win\xcrt_x86.asm">
       <ExcludedFromBuild Condition="'$(XcrtEnabled)'!='true' or '$(Platform)'!='Win32'">true</ExcludedFromBuild>
     </MASM>
+    <MASM Include="..\..\..\..\xport\src\platform\win\xcrt_x64.asm">
+      <ExcludedFromBuild Condition="'$(XcrtEnabled)'!='true' or '$(Platform)'!='x64'">true</ExcludedFromBuild>
+    </MASM>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <Target Name="RejectNativeRefactoringLockstep" BeforeTargets="PrepareForBuild" Condition="'$(LockstepDebug)'=='true'">
+    <Error Text="Agent Armstrong uses native refactoring; lockstep requires the preserved pre-refactoring baseline." />
+  </Target>
+  <Target Name="XportSelectNativeArch" BeforeTargets="PrepareForBuild">
+    <ReadLinesFromFile File="$(ProjectDir)..\..\..\_build\native-$(Configuration).arch" Condition="Exists('$(ProjectDir)..\..\..\_build\native-$(Configuration).arch')">
+      <Output TaskParameter="Lines" PropertyName="PreviousNativeArch" />
+    </ReadLinesFromFile>
+    <Delete Files="$(TargetPath)" Condition="'$(PreviousNativeArch)'!='$(NativeArch)' And Exists('$(TargetPath)')" />
+  </Target>
+  <Target Name="XportRecordNativeArch" AfterTargets="Link">
+    <WriteLinesToFile File="$(ProjectDir)..\..\..\_build\native-$(Configuration).arch" Lines="$(NativeArch)" Overwrite="true" />
+  </Target>
   <ImportGroup Label="ExtensionTargets">
     <Import Project="$(VCTargetsPath)\BuildCustomizations\masm.targets" />
   </ImportGroup>

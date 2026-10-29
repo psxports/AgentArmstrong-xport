@@ -14,12 +14,9 @@
 
 /* BEGIN GENERATED MODULE API */
 void airship_create(EFFECT *effect);
-void airship_switch_create(EFFECT *effect);
-void explosive_projectile_impact(PROJECTILE *projectile);
-void explosive_projectile_trail_update(PROJECTILE *projectile);
-void hierarchy_collision_box_update(void *object_value, MODEL_NODE *first_node, sint32 count);
+void explosive_projectile_impact(void *raw_projectile);
+void explosive_projectile_trail_update(void *raw_projectile);
 void jetpack_enemy_create(EFFECT *effect);
-void lift_create(EFFECT *effect);
 /* END GENERATED MODULE API */
 
 #endif

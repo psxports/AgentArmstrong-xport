@@ -1,75 +1,102 @@
+#include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
+#include "runtime_heap.h"
+#include "collision.h"
+#include "input_record.h"
+#include "hq.h"
+#include "mission.h"
+#include "effect_update.h"
+#include "game_runtime.h"
+#include "level_data.h"
+#include "map.h"
+#include "model.h"
 #include "object.h"
+#include "player.h"
+#include "render.h"
+#include "spatial.h"
 #include "sprite.h"
-#include "stubs.h"
 
-/* Types. */
-typedef union RuntimeArena
+typedef enum
 {
-    uint64 alignment;
-    /* PAL InitHeap reports 0x104C4C bytes at 0x800FADD0.  FUN_8008C3C0
-     * reserves 0x44C0 for the loaded overlay and aligns the remainder. */
-    uint8 bytes[0x100788];
-} RuntimeArena;
+    HEAP_BLOCK_FREE,
+    HEAP_BLOCK_ACTIVE,
+    HEAP_BLOCK_PENDING
+} HEAP_BLOCK_STATE;
 
-/* Variables. */
-/* Contiguous host arena implementing the PAL allocator at
- * 0x8008C3C0..0x8008C80C. */
-
-static sint32 heap_dirty;
-
-static RuntimeArena runtime_arena;
-
-static sint32 heap_ready;
-
-/* Functions. */
-/* PsyQ libc entry used by the original allocator. */
-/* Original: FUN_800B0F04. */
-static void memory_move(void *destination, const void *source, sint32 size)
+typedef union
 {
-    memmove(destination, source, (uint32)size);
-}
+    long double alignment;
+    void *pointer_alignment;
 
-static uint8 *heap_begin(void)
-{
-    return runtime_arena.bytes;
-}
+    struct
+    {
+        sint32 size;
+        HEAP_BLOCK_STATE state;
+    } info;
+} HEAP_BLOCK;
 
-static uint8 *heap_end(void)
-{
-    return runtime_arena.bytes + sizeof(runtime_arena.bytes);
-}
+enum { HEAP_BLOCK_BYTES = sizeof(HEAP_BLOCK) };
 
-static sint32 block_size(const uint8 *block)
+typedef struct
 {
-    return *(const sint32 *)block;
-}
+    HEAP_BLOCK *begin;
+    sint32 capacity;
+    uint8 dirty;
+} RUNTIME_HEAP;
 
-static uint8 block_state(const uint8 *block)
+/* Original payload budget after the loaded overlay reservation */
+enum
 {
-    return block[4];
-}
+    RUNTIME_HEAP_CAPACITY = 0x100788
+};
 
-static void block_set_state(uint8 *block, uint8 state)
+static RUNTIME_HEAP heap;
+
+/* Native lifecycle only; never dereference objects whose arena is ending */
+static void heap_invalidate_references(void)
 {
-    block[4] = state;
+    linked_list_initialize(&g_object_list);
+    linked_list_initialize(&g_auxiliary_object_list);
+    linked_list_initialize(&g_ledge_trigger_list);
+    player_heap_reset();
+    hq_heap_reset();
+    input_rec_heap_reset();
+    effects_heap_reset();
+    model_heap_reset();
+    col_heap_reset();
+    map_heap_reset();
+    level_data_heap_reset();
+    game_runtime_heap_reset();
+    g_spatial_cell_buckets = 0;
+    g_spatial_cell_count = 0;
+    spatial_buckets_reset();
+    spr_vram_reset_deferred();
+    g_next_frame_object = g_frame_objects;
+    g_next_transient_prim = g_transient_prims;
+    g_mission.timer = 0;
+    g_model_draw.target_frame = 0;
 }
 
 static void heap_reset_state(void)
 {
-    uint8 *block = heap_begin();
-    memset(block, 0, 8);
-    *(sint32 *)block = (sint32)sizeof(runtime_arena.bytes) & ~7;
-    heap_ready = 1;
-    heap_dirty = 0;
-    sprite_vram_reset_deferred();
+    heap_invalidate_references();
+    if (heap.begin == 0)
+    {
+        heap.capacity = RUNTIME_HEAP_CAPACITY / sizeof(HEAP_BLOCK) * sizeof(HEAP_BLOCK);
+        heap.begin = malloc(heap.capacity);
+        XASSERT(!(heap.begin == 0));
+    }
+    memset(heap.begin, 0, sizeof(*heap.begin));
+    heap.begin->info.size = heap.capacity;
+    heap.begin->info.state = HEAP_BLOCK_FREE;
+    heap.dirty = 0;
 }
 
 static void heap_ensure(void)
 {
-    if (!heap_ready)
+    if (heap.begin == 0)
         heap_reset_state();
 }
 
@@ -77,136 +104,167 @@ static void heap_ensure(void)
 GDB_CALL void *runtime_heap_initialize(void)
 {
     heap_reset_state();
-    return heap_begin();
+    return heap.begin;
+}
+
+void runtime_heap_release(void)
+{
+    heap_invalidate_references();
+    free(heap.begin);
+    memset(&heap, 0, sizeof(heap));
 }
 
 /* Original: FUN_8008C414. */
 GDB_CALL void *runtime_heap_allocate(sint32 size)
 {
-    sint32 requested = (size + 15) & ~7;
-    uint8 *block, *end;
+    HEAP_BLOCK *block;
+    uint8 *end;
+    sint32 requested, remainder;
+    HEAP_BLOCK *allocated;
     heap_ensure();
-    block = heap_begin();
-    end = heap_end();
-    while (block < end && (block_state(block) != 0 || block_size(block) < requested))
-        block += block_size(block);
-    if (block >= end)
+    if (size < 0 || size > heap.capacity - HEAP_BLOCK_BYTES)
     {
-        fatal_error_with_value("OUT OF MEMORY", requested);
+        fatal_error_with_val("HEAP SIZE", size);
         abort();
     }
+    requested = size + sizeof(HEAP_BLOCK);
+    requested += (sizeof(HEAP_BLOCK) - requested % sizeof(HEAP_BLOCK)) % sizeof(HEAP_BLOCK);
+    block = heap.begin;
+    end = (uint8 *)heap.begin + heap.capacity;
+    while ((uint8 *)block < end && (block->info.state != HEAP_BLOCK_FREE || block->info.size < requested))
+        block = (HEAP_BLOCK *)((uint8 *)block + block->info.size);
+    if ((uint8 *)block >= end)
     {
-        sint32 remainder = block_size(block) - requested;
-        uint8 *allocated = block + remainder;
-        *(sint32 *)block = remainder;
-        *(sint32 *)allocated = requested;
-        allocated[4] = 1;
-        allocated[5] = allocated[6] = allocated[7] = 0;
-        memset(allocated + 8, 0, (uint32)(requested - 8));
-        return allocated + 8;
+        fatal_error_with_val("OUT OF MEMORY", requested);
+        abort();
     }
+    remainder = block->info.size - requested;
+    allocated = (HEAP_BLOCK *)((uint8 *)block + remainder);
+    block->info.size = remainder;
+    memset(allocated, 0, sizeof(*allocated));
+    allocated->info.size = requested;
+    allocated->info.state = HEAP_BLOCK_ACTIVE;
+    memset(allocated + 1, 0, requested - sizeof(*allocated));
+    return allocated + 1;
 }
 
 /* Original: FUN_8008C4E8. */
 void *runtime_heap_allocate_best_fit(sint32 size)
 {
-    sint32 requested = (size + 15) & ~7;
-    sint32 best_size = 0x7fffffff;
-    uint8 *block, *best = 0, *end;
+    HEAP_BLOCK *block, *best = 0, *allocated;
+    uint8 *end;
+    sint32 requested, best_size = 0x7fffffff, remainder;
     heap_ensure();
-    block = heap_begin();
-    end = heap_end();
-    while (block < end)
+    if (size < 0 || size > heap.capacity - HEAP_BLOCK_BYTES)
     {
-        sint32 current_size = block_size(block);
-        if (block_state(block) == 0 && requested < current_size && current_size < best_size)
+        fatal_error_with_val("HEAP SIZE", size);
+        abort();
+    }
+    requested = size + sizeof(HEAP_BLOCK);
+    requested += (sizeof(HEAP_BLOCK) - requested % sizeof(HEAP_BLOCK)) % sizeof(HEAP_BLOCK);
+    block = heap.begin;
+    end = (uint8 *)heap.begin + heap.capacity;
+    while ((uint8 *)block < end)
+    {
+        sint32 size = block->info.size;
+        if (block->info.state == HEAP_BLOCK_FREE && requested < size && size < best_size)
         {
             best = block;
-            best_size = current_size;
+            best_size = size;
         }
-        block += current_size;
+        block = (HEAP_BLOCK *)((uint8 *)block + size);
     }
     if (best == 0)
     {
-        fatal_error_with_value("OUT OF MEMORY", requested);
+        fatal_error_with_val("OUT OF MEMORY", requested);
         abort();
     }
-    {
-        sint32 remainder = block_size(best) - requested;
-        uint8 *allocated = best + remainder;
-        *(sint32 *)best = remainder;
-        *(sint32 *)allocated = requested;
-        allocated[4] = 1;
-        allocated[5] = allocated[6] = allocated[7] = 0;
-        memset(allocated + 8, 0, (uint32)(requested - 8));
-        return allocated + 8;
-    }
+    remainder = best->info.size - requested;
+    allocated = (HEAP_BLOCK *)((uint8 *)best + remainder);
+    best->info.size = remainder;
+    memset(allocated, 0, sizeof(*allocated));
+    allocated->info.size = requested;
+    allocated->info.state = HEAP_BLOCK_ACTIVE;
+    memset(allocated + 1, 0, requested - sizeof(*allocated));
+    return allocated + 1;
 }
 
-/* Direct control flow of FUN_8008C5E4.  The PSX arena keeps the shrunken
- * allocation at the high end of the old block. */
+/* Original: FUN_8008C5E4. */
 void *runtime_heap_shrink(void *pointer, sint32 size)
 {
-    sint32 aligned = (size + 15) & ~7;
-    uint8 *old_block = (uint8 *)pointer - 8;
-    sint32 old_size = *(sint32 *)old_block;
-    sint32 remainder = old_size - aligned;
-    uint8 *new_block;
-
-    if ((uint32)remainder < 0x10u)
+    HEAP_BLOCK *old_block = (HEAP_BLOCK *)pointer - 1;
+    sint32 requested, remainder;
+    HEAP_BLOCK *new_block;
+    if (size < 0 || size > old_block->info.size - HEAP_BLOCK_BYTES)
+    {
+        fatal_error_with_val("HEAP SHRINK SIZE", size);
+        abort();
+    }
+    requested = size + sizeof(HEAP_BLOCK);
+    requested += (sizeof(HEAP_BLOCK) - requested % sizeof(HEAP_BLOCK)) % sizeof(HEAP_BLOCK);
+    remainder = old_block->info.size - requested;
+    if (remainder < 2 * sizeof(HEAP_BLOCK))
         return pointer;
-    new_block = old_block + remainder;
-    memory_move(new_block, old_block, aligned);
-    *(sint32 *)new_block = aligned;
-    new_block[4] = 1;
-    new_block[5] = new_block[6] = new_block[7] = 0;
-    *(sint32 *)old_block = remainder;
-    old_block[4] = 0;
-    return new_block + 8;
+    new_block = (HEAP_BLOCK *)((uint8 *)old_block + remainder);
+    memmove(new_block + 1, old_block + 1, requested - sizeof(HEAP_BLOCK));
+    memset(new_block, 0, sizeof(*new_block));
+    new_block->info.size = requested;
+    new_block->info.state = HEAP_BLOCK_ACTIVE;
+    old_block->info.size = remainder;
+    old_block->info.state = HEAP_BLOCK_FREE;
+    return new_block + 1;
 }
 
-/* Direct translation of FUN_8008C680. */
+/* Original: FUN_8008C680. */
 GDB_CALL void *runtime_heap_allocate_sector_aligned(sint32 size)
 {
+    if (size < 0 || size > 0x7ffff800)
+    {
+        fatal_error_with_val("SECTOR BUFFER SIZE", size);
+        abort();
+    }
     return runtime_heap_allocate_best_fit((size + 0x7ff) & ~0x7ff);
 }
 
-/* Direct translation of FUN_8008C700. */
+/* Original: FUN_8008C700. */
 GDB_CALL void runtime_heap_defer_free(void *pointer)
 {
+    HEAP_BLOCK *block;
     if (pointer == 0)
         return;
-    *((uint8 *)pointer - 4) = 2;
-    heap_dirty = 1;
+    block = (HEAP_BLOCK *)pointer - 1;
+    block->info.state = HEAP_BLOCK_PENDING;
+    heap.dirty = 1;
 }
 
-/* Direct translation of FUN_8008C76C. */
+/* Original: FUN_8008C76C. */
 GDB_CALL void runtime_heap_sweep(void)
 {
-    uint8 *current, *previous, *end;
-    if (!heap_dirty)
+    HEAP_BLOCK *cur, *prev;
+    uint8 *end;
+    if (!heap.dirty)
         return;
-    heap_dirty = 0;
-    current = heap_begin();
-    end = heap_end();
-    while (current < end)
+    heap.dirty = 0;
+    cur = heap.begin;
+    end = (uint8 *)heap.begin + heap.capacity;
+    while ((uint8 *)cur < end)
     {
-        previous = current;
-        if (block_state(current) == 1)
+        prev = cur;
+        if (cur->info.state == HEAP_BLOCK_ACTIVE)
         {
-            current += block_size(current);
+            cur = (HEAP_BLOCK *)((uint8 *)cur + cur->info.size);
             continue;
         }
-        block_set_state(current, 0);
+        cur->info.state = HEAP_BLOCK_FREE;
         for (;;)
         {
-            current += block_size(current);
-            if (current >= end)
+            cur = (HEAP_BLOCK *)((uint8 *)cur + cur->info.size);
+            if ((uint8 *)cur >= end)
                 return;
-            if (block_state(current) == 1)
+            if (cur->info.state == HEAP_BLOCK_ACTIVE)
                 break;
-            *(sint32 *)previous += block_size(current);
-            current = previous;
+            prev->info.size += cur->info.size;
+            cur = prev;
         }
     }
 }

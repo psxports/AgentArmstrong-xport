@@ -1,38 +1,177 @@
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include "global.h"
+
+#include "object.h"
+#include "game.h"
 #include "game_runtime.h"
 #include "player.h"
 #include "psx.h"
 #include "resource_table.h"
 #include "sprite.h"
-#include "stubs.h"
 #include "text_renderer.h"
+#include "render.h"
+
+/* Original: FUN_800B0EC4. */
+/* Borrowed decimal text remains valid until the next conversion */
+GDB_CALL char *integer_to_text(sint32 val)
+{
+    static char text[32];
+    snprintf(text, sizeof(text), "%d", val);
+    return text;
+}
+
+GAME_TEXT g_game_text;
+
+/* Decode the original relative string table without relocating file bytes */
+sint32 game_text_load(const void *data, uint32 size, sint32 language)
+{
+    const uint8 *src = (const uint8 *)data;
+    uint32 offsets[GAME_TEXT_COUNT];
+    uint32 idx;
+    uint8 *copy;
+    if (!src || size < (GAME_TEXT_COUNT + 1) * sizeof(uint32))
+        return 0;
+    for (idx = 0; idx < GAME_TEXT_COUNT; ++idx)
+    {
+        uint32 offset = xport_load_le32(src + idx * sizeof(uint32));
+        if (offset == 0xffffffffu || (offset != 0 && (offset >= size || !memchr(src + offset, 0, size - offset))))
+            return 0;
+        offsets[idx] = offset;
+    }
+    if (xport_load_le32(src + GAME_TEXT_COUNT * sizeof(uint32)) != 0xffffffffu)
+        return 0;
+    copy = (uint8 *)malloc(size);
+    if (!copy)
+        return 0;
+    memcpy(copy, src, size);
+    free(g_game_text.data);
+    g_game_text.data = copy;
+    g_game_text.size = size;
+    g_game_text.unavailable_stage = (const char *)copy + sizeof(uint32);
+    for (idx = 0; idx < GAME_TEXT_COUNT; ++idx)
+        g_game_text.entries[idx] = offsets[idx] ? (const char *)copy + offsets[idx] : 0;
+    resource_table_register(0x18800, g_game_text.data, g_game_text.size, RESOURCE_BORROW);
+    g_session.language = language;
+    return 1;
+}
+
+TEXT_RENDER_STATE g_text_renderer;
+
+/* Application teardown ends the language allocation and font borrow */
+void text_renderer_release(void)
+{
+    free(g_game_text.data);
+    memset(&g_game_text, 0, sizeof(g_game_text));
+    g_text_renderer.font = 0;
+}
+
+enum
+{
+    FONT_RESOURCE = 0x2fc00
+};
+
+/* Original data: SLES_004.74:0x800709FC..0x8007222B */
+static const uint32 font_resource[1548] = {
+    0x00000001u, 0x00000028u, 0x00000010u, 0x80000000u, 0x39ce294au, 0x5ad64a52u, 0x6b5a5ef7u, 0x7fff7bdeu, 0x001d0320u, 0x02df7fe0u, 0x00007fffu, 0x00003000u, 0x88000000u, 0x00000068u, 0x00088088u, 0x00600000u, 0x00000060u, 0x00008840u, 0x00488400u, 0x40000884u, 0x00488888u, 0x88800000u, 0x00000000u, 0x00068600u, 0x06860000u, 0x00000000u, 0x00000600u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000800u, 0x00688860u, 0x86000000u, 0x00000008u, 0x00688886u, 0x88860000u, 0x00000068u, 0x00886000u, 0x88860000u, 0x00000688u, 0x88400000u, 0x00000128u, 0x00168168u, 0x01860000u, 0x00000186u, 0x00068886u, 0x40824840u, 0x80001488u, 0x00883188u, 0x68800000u, 0x00000001u, 0x00116860u, 0x68600000u, 0x00000000u, 0x00001860u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x60001880u, 0x06888888u, 0x88600000u, 0x60000018u, 0x06888888u, 0x88886000u, 0x00000688u, 0x01688600u,
+    0x88886000u, 0x00001368u, 0x88600000u, 0x00000016u, 0x00126126u, 0x01880000u, 0x60000188u, 0x00688888u, 0x84842480u, 0x80000148u, 0x01886368u, 0x16800000u, 0x00000001u, 0x00011686u, 0x86000000u, 0x00000006u, 0x00006880u, 0x06000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x86001188u, 0x18862126u, 0x88860000u, 0x86000016u, 0x16883236u, 0x32368600u, 0x00001686u, 0x01388860u, 0x11388000u, 0x00000111u, 0x88800000u, 0x00000012u, 0x00010010u, 0x88888800u, 0x86000888u, 0x01861881u, 0x88484280u, 0x40000014u, 0x01688688u, 0x11000000u, 0x60000000u, 0x00001168u, 0x80000000u, 0x00000018u, 0x00018886u, 0x18600000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x80000000u, 0x68600118u, 0x18800012u, 0x88100000u, 0x10000013u, 0x12686011u, 0x60111000u, 0x00001368u, 0x00188386u, 0x00188600u, 0x00000000u, 0x68800000u, 0x00000001u, 0x00000000u, 0x81188000u, 0x86001118u, 0x01101881u, 0x48848840u, 0x84000001u,
+    0x00368888u, 0x00000000u, 0x80000000u, 0x00000118u, 0x80000000u, 0x88600018u, 0x06888888u, 0x18800000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x88000000u, 0x28800011u, 0x18800001u, 0x88000000u, 0x00000002u, 0x01268600u, 0x86000000u, 0x60000238u, 0x00168138u, 0x88888800u, 0x00000006u, 0x28840000u, 0x00000001u, 0x00000000u, 0x80188000u, 0x60000018u, 0x00006888u, 0x14884000u, 0x88400000u, 0x00688626u, 0x00000000u, 0x80000000u, 0x00000018u, 0x80000000u, 0x86000018u, 0x11688888u, 0x88888600u, 0x00000068u, 0x00000000u, 0x88886000u, 0x00000068u, 0x00000000u, 0x18800000u, 0x16860001u, 0x18800000u, 0x88000000u, 0x00000001u, 0x00126860u, 0x88600000u, 0x86000028u, 0x00138013u, 0x88888860u, 0x00000068u, 0x16860000u, 0x00000000u, 0x00000000u, 0x80188000u, 0x00000018u, 0x00068888u, 0x88488400u, 0x68840004u, 0x00886002u, 0x00000000u, 0x80000000u, 0x00000018u, 0x80000000u, 0x60000018u, 0x01188888u, 0x88888860u, 0x00000116u, 0x00000000u,
+    0x88888600u, 0x00000116u, 0x00000000u, 0x11880000u, 0x12880000u, 0x18800000u, 0x68600000u, 0x00000001u, 0x00012686u, 0x62000000u, 0x88600068u, 0x06888888u, 0x11111100u, 0x00000686u, 0x12770000u, 0x00000000u, 0x00000000u, 0x77777770u, 0x07700077u, 0x00177177u, 0x24747740u, 0x26770007u, 0x02763000u, 0x00000000u, 0x70000000u, 0x00000017u, 0x77000000u, 0x74000017u, 0x00177777u, 0x11771100u, 0x00000011u, 0x00000000u, 0x11111000u, 0x00000011u, 0x00000000u, 0x01177000u, 0x02770000u, 0x14740000u, 0x37700000u, 0x60000001u, 0x00001268u, 0x30000000u, 0x77760777u, 0x11777777u, 0x00000770u, 0x00001773u, 0x01100000u, 0x00000000u, 0x00000000u, 0x66116600u, 0x66600111u, 0x00116666u, 0x42464664u, 0x26660016u, 0x06666300u, 0x00000000u, 0x60000000u, 0x00000066u, 0x66600000u, 0x66000011u, 0x00466414u, 0x01660000u, 0x00000000u, 0x00000660u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00116600u, 0x04660000u, 0x12464000u, 0x26600000u, 0x86000000u, 0x00000126u, 0x63003666u,
+    0x11101666u, 0x01136631u, 0x30003660u, 0x00001366u, 0x00055000u, 0x00000000u, 0x00000000u, 0x55015500u, 0x55000001u, 0x00011555u, 0x54251455u, 0x55520012u, 0x12555555u, 0x00000000u, 0x00000000u, 0x00000555u, 0x15550000u, 0x45400001u, 0x01554011u, 0x01150000u, 0x00000000u, 0x00001550u, 0x00000000u, 0x00000000u, 0x00000550u, 0x00011550u, 0x55540000u, 0x01245555u, 0x55555000u, 0x88600055u, 0x00578888u, 0x55555550u, 0x00001355u, 0x00013550u, 0x55555550u, 0x00000135u, 0x00144000u, 0x00000000u, 0x00000000u, 0x44014400u, 0x40000001u, 0x00001114u, 0x24420144u, 0x44200001u, 0x04424444u, 0x00000000u, 0x00000000u, 0x00004440u, 0x11444000u, 0x11440000u, 0x04410001u, 0x00100000u, 0x00000000u, 0x00001144u, 0x00000000u, 0x00000000u, 0x00001440u, 0x00001144u, 0x44400000u, 0x00124444u, 0x44444400u, 0x88860124u, 0x01247888u, 0x44444400u, 0x00000234u, 0x00001444u, 0x44444430u, 0x00000013u, 0x00110000u, 0x00000000u, 0x00000000u, 0x10011000u, 0x00000001u, 0x00000011u,
+    0x11000010u, 0x10000000u, 0x11011111u, 0x00000000u, 0x00000000u, 0x00011100u, 0x01110000u, 0x01100000u, 0x11000000u, 0x00000000u, 0x00000000u, 0x00000110u, 0x00000000u, 0x00000000u, 0x00001100u, 0x00000110u, 0x11000000u, 0x00011111u, 0x11111000u, 0x11100011u, 0x00111111u, 0x11111000u, 0x00000011u, 0x00001110u, 0x11111000u, 0x00000001u, 0x68600000u, 0x86000000u, 0x06888888u, 0x88860000u, 0x00000068u, 0x00688886u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000884u, 0x00000000u, 0x00000478u, 0x60000000u, 0x00068888u, 0x58885000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x16860000u, 0x88600001u, 0x13888888u, 0x88886000u, 0x60000688u, 0x06888888u, 0x00000000u, 0x00000000u, 0x00000000u, 0x84000000u, 0x00001488u, 0x00000000u, 0x00047874u, 0x86000000u, 0x00688888u, 0x88888500u,
+    0x00000005u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x11686000u, 0x11000000u, 0x01688111u, 0x31368600u, 0x86001886u, 0x18861136u, 0x08800000u, 0x00000000u, 0x00000880u, 0x88840000u, 0x00000114u, 0x00000000u, 0x04787411u, 0x68600000u, 0x06863113u, 0x51115850u, 0x00000058u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x01168600u, 0x00000000u, 0x01388300u, 0x00138860u, 0x88601683u, 0x18830013u, 0x18800000u, 0x00000000u, 0x00001880u, 0x14888400u, 0x60000001u, 0x00688888u, 0x78741100u, 0x38800004u, 0x18830001u, 0x38883585u, 0x40000585u, 0x49999999u, 0x99999600u, 0x30000399u, 0x03999997u, 0x99999700u, 0x97000038u, 0x99999999u, 0x99999700u, 0x30007999u,
+    0x03799997u, 0x01799000u, 0x00005990u, 0x00079930u, 0x99999700u, 0x00000799u, 0x68888860u, 0x00000000u, 0x00168600u, 0x30018860u, 0x88601366u, 0x16863003u, 0x11000000u, 0x00000000u, 0x00001100u, 0x01148884u, 0x86000000u, 0x01168888u, 0x74110000u, 0x11000478u, 0x16888600u, 0x85158188u, 0x94001880u, 0x14999999u, 0x99999000u, 0x73000999u, 0x07999999u, 0x99999300u, 0x90000389u, 0x19999999u, 0x99999300u, 0x93001799u, 0x07999999u, 0x01399000u, 0x00003990u, 0x00139940u, 0x99997000u, 0x00007999u, 0x88888886u, 0x00000006u, 0x00138830u, 0x88888630u, 0x86000138u, 0x13888888u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00014888u, 0x10000000u, 0x00111111u, 0x41000000u, 0x00001787u, 0x13688860u, 0x88888188u, 0x30001881u, 0x11194149u, 0x11499300u, 0x97301994u, 0x11111116u, 0x11199300u, 0x93001794u, 0x11111119u, 0x11199300u, 0x99301111u, 0x11111117u, 0x01199300u, 0x00001997u, 0x00119970u, 0x99110000u, 0x00001113u, 0x63113588u, 0x00000068u, 0x00016860u, 0x88888863u,
+    0x60000068u, 0x01688888u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00048884u, 0x00000000u, 0x00000000u, 0x74000000u, 0x00001478u, 0x01113686u, 0x51115188u, 0x83001881u, 0x01384114u, 0x88888700u, 0x68701288u, 0x00000011u, 0x00148700u, 0x87001883u, 0x11788888u, 0x88888700u, 0x78800078u, 0x09993011u, 0x88888700u, 0x00001788u, 0x00117870u, 0x78300000u, 0x00000013u, 0x30001377u, 0x00000177u, 0x00013773u, 0x31113777u, 0x00000177u, 0x01377111u, 0x06600000u, 0x00000000u, 0x00000660u, 0x04888411u, 0x60000000u, 0x00688888u, 0x78740000u, 0x00000114u, 0x00001368u, 0x00010885u, 0x77301588u, 0x01777777u, 0x77777730u, 0x17731777u, 0x00000001u, 0x00117730u, 0x77301773u, 0x01177777u, 0x77777730u, 0x17730017u, 0x17777301u, 0x77777730u, 0x00001377u, 0x00014773u, 0x77700177u, 0x00000011u, 0x63003466u, 0x00000136u, 0x00001666u, 0x63001366u, 0x00000166u, 0x00166300u, 0x15500000u, 0x00000000u, 0x00001550u, 0x77741100u, 0x76000002u, 0x01167777u, 0x14777200u, 0x00000001u,
+    0x00000110u, 0x70007750u, 0x66631157u, 0x13666666u, 0x11136660u, 0x16661663u, 0x06630000u, 0x30013660u, 0x66601366u, 0x01111111u, 0x11113660u, 0x16660011u, 0x16611000u, 0x11113660u, 0x00001166u, 0x00012666u, 0x36630166u, 0x00000001u, 0x55555555u, 0x30000013u, 0x00001355u, 0x55555555u, 0x00000135u, 0x00155500u, 0x11000000u, 0x00000000u, 0x00001400u, 0x52110000u, 0x10000255u, 0x00111111u, 0x01125552u, 0x50000000u, 0x00000005u, 0x55555500u, 0x25550115u, 0x15541111u, 0x55555553u, 0x55531355u, 0x11555555u, 0x55555553u, 0x55530135u, 0x13555555u, 0x00011553u, 0x55530000u, 0x13555555u, 0x31111553u, 0x00001155u, 0x00011555u, 0x13553353u, 0x00000001u, 0x34444440u, 0x40000001u, 0x00000144u, 0x44444443u, 0x00000013u, 0x00134400u, 0x00000000u, 0x00000000u, 0x00000000u, 0x11000000u, 0x00000442u, 0x00000000u, 0x00011244u, 0x40000000u, 0x00000014u, 0x34443000u, 0x12440011u, 0x14410001u, 0x44444444u, 0x44311134u, 0x01134444u, 0x44444444u, 0x44440013u, 0x11344444u,
+    0x00001444u, 0x44310000u, 0x01344444u, 0x40001344u, 0x00000144u, 0x00011444u, 0x11344430u, 0x00000000u, 0x11111100u, 0x00000000u, 0x00000111u, 0x11111100u, 0x00000001u, 0x00011000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00001111u, 0x00000000u, 0x00000111u, 0x00000000u, 0x00000011u, 0x11110000u, 0x11100001u, 0x11100000u, 0x11111110u, 0x11100111u, 0x00111111u, 0x11111111u, 0x11100001u, 0x01111111u, 0x00001110u, 0x11100000u, 0x00111111u, 0x00001110u, 0x00000111u, 0x00001111u, 0x11111110u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00e00000u, 0xb0000000u, 0x0000beeeu, 0x0000000eu, 0xeeed0e00u, 0x0deeeeeeu, 0x44000000u, 0x00000000u, 0x00000000u, 0x00000000u,
+    0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x0aaa0000u, 0xbb000000u, 0x000bbbbbu, 0x000000ccu, 0xdddd1cc0u, 0x1dddddddu, 0x55000000u, 0x00000001u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x00000000u, 0x1a1a0000u, 0xbbb00000u, 0x00bbb111u, 0x00000cc0u, 0x11dd11ccu, 0x1dd11111u, 0x10000000u, 0x00000001u, 0x01799000u, 0x90000795u, 0x00001179u, 0x01799000u, 0x60005993u, 0x99700179u, 0x99963000u, 0x96000369u, 0x03699999u, 0x99963000u, 0x96000369u, 0x03699999u,
+    0x99996300u, 0x96009999u, 0x69999999u, 0x00099300u, 0x96000960u, 0x99300116u, 0x00007990u, 0x59901799u, 0x09950001u, 0x00116990u, 0x99007950u, 0x03799999u, 0xaa1aa000u, 0x1bbb0000u, 0x0bbb0001u, 0xc000cc00u, 0x01dd011cu, 0x1dd00000u, 0x07720000u, 0x00000000u, 0x51799000u, 0x93001379u, 0x00001139u, 0x37999000u, 0x90005999u, 0x59931799u, 0x99999300u, 0x93001699u, 0x16999999u, 0x99996300u, 0x93000699u, 0x16999999u, 0x99999600u, 0x99001799u, 0x16999999u, 0x00169600u, 0x99301990u, 0x39930113u, 0x30013990u, 0x97301399u, 0x03995015u, 0x01169730u, 0x99903795u, 0x01379999u, 0xa011a000u, 0x11bb0001u, 0x1bb00000u, 0xce0ec000u, 0x01dd0011u, 0x1dd00000u, 0x16860000u, 0x00000000u, 0x95399400u, 0x95001137u, 0x00000119u, 0x99799500u, 0x93003997u, 0x39957999u, 0x11369930u, 0x93001993u, 0x16961116u, 0x11369630u, 0x93001993u, 0x16993139u, 0x11199600u, 0x11001111u, 0x11119961u, 0x00139930u, 0x99601990u, 0x13993111u, 0x70111990u, 0x73001179u, 0x01399559u, 0x51697300u,
+    0x11101379u, 0x01137973u, 0xa001aa00u, 0x01bb000au, 0x1bb00000u, 0x1cec0000u, 0x01dd0001u, 0x1dd00000u, 0x14882000u, 0x00000000u, 0x78888700u, 0x87000113u, 0x00000117u, 0x77378600u, 0x86001983u, 0x36889889u, 0x11136860u, 0x86001881u, 0x13688888u, 0x11136860u, 0x86001881u, 0x13688888u, 0x88888300u, 0x10001368u, 0x11116881u, 0x00116860u, 0x68801880u, 0x11388311u, 0x81141783u, 0x30000138u, 0x01139887u, 0x85873000u, 0x31101137u, 0x00113787u, 0x00011a00u, 0x01bb001au, 0x1bb00000u, 0x1ccc0000u, 0x01dd0000u, 0x1dd00000u, 0x11886000u, 0x00000000u, 0x77777740u, 0x77400013u, 0x00000113u, 0x11137730u, 0x77301777u, 0x15888737u, 0x00113773u, 0x77301773u, 0x11377777u, 0x77113773u, 0x77301773u, 0x01377777u, 0x77775100u, 0x00001777u, 0x00113770u, 0x00113773u, 0x37731773u, 0x01137731u, 0x71464575u, 0x73000117u, 0x00113777u, 0x77730000u, 0x73000113u, 0x00011377u, 0x00001aa0u, 0x0bbb00aau, 0x1bbb0000u, 0xcc1cc000u, 0x01dd0000u, 0x1dd00000u, 0x01888200u, 0x00000000u,
+    0x63136660u, 0x66600036u, 0x00000011u, 0x30116660u, 0x66601366u, 0x13887311u, 0x30011666u, 0x66601366u, 0x01111111u, 0x63111666u, 0x66601666u, 0x11663111u, 0x11111000u, 0x00001673u, 0x00111663u, 0x30111666u, 0x16631666u, 0x00113663u, 0x66666666u, 0x66300113u, 0x01136636u, 0x36630000u, 0x66300011u, 0x00001136u, 0x000011a0u, 0xbbb001a0u, 0x11bbb000u, 0xc011cc00u, 0x01dd000cu, 0x1dd00000u, 0x01688600u, 0x00000000u, 0x31113553u, 0x55530355u, 0x15555555u, 0x50113553u, 0x35531155u, 0x11673111u, 0x55555553u, 0x35531135u, 0x00111111u, 0x55555555u, 0x35531355u, 0x13551111u, 0x55555550u, 0x00001555u, 0x00011555u, 0x55555553u, 0x55551355u, 0x00011355u, 0x55533555u, 0x35530011u, 0x01355311u, 0x13553000u, 0x55530001u, 0x11455555u, 0xeeeeeaaau, 0xbb000aaau, 0x011bbbbbu, 0x00011cc0u, 0xeddd00ccu, 0x1dddeeeeu, 0x01488820u, 0x00000000u, 0x10113444u, 0x44441443u, 0x13444444u, 0x40011444u, 0x14441144u, 0x11331011u, 0x44444431u, 0x14440113u, 0x00000011u, 0x34444443u,
+    0x14441444u, 0x14430001u, 0x44444444u, 0x00001344u, 0x00011444u, 0x44444431u, 0x44441134u, 0x00001134u, 0x44411344u, 0x13440011u, 0x01443111u, 0x11344300u, 0x44440000u, 0x14444444u, 0xaaaaaaaau, 0xb0001aaau, 0x0011bbbbu, 0x000011ccu, 0xdddd0cc0u, 0x1dddddddu, 0x01188860u, 0x00000000u, 0x00011110u, 0x11101111u, 0x11111111u, 0x00011110u, 0x11101111u, 0x11110001u, 0x11111110u, 0x11100011u, 0x00000001u, 0x11111110u, 0x11101111u, 0x11100001u, 0x11111110u, 0x00000111u, 0x00011111u, 0x11111110u, 0x11110111u, 0x00000111u, 0x11011111u, 0x11110001u, 0x01111001u, 0x01111000u, 0x11100000u, 0x11111111u, 0x11111110u, 0x00001111u, 0x00011111u, 0x00000110u, 0x11101100u, 0x11111111u, 0x00111100u, 0x00000000u, 0x08800000u, 0x90000000u, 0x00000049u, 0x00000000u, 0x94000994u, 0x00499999u, 0x00009900u, 0x00000990u, 0x00000000u, 0x04990000u, 0x00000000u, 0x00009940u, 0x99999400u, 0x00000049u, 0x00099400u, 0x99994000u, 0x90000499u, 0x09900009u, 0x04990000u, 0x00000000u,
+    0x00009940u, 0x99999400u, 0x99000049u, 0x09900000u, 0x04990000u, 0x00000000u, 0x00009940u, 0x99994000u, 0x99000499u, 0x09900000u, 0x99400000u, 0x00004904u, 0x18800000u, 0x10000000u, 0x00000994u, 0x90000000u, 0x49000149u, 0x00941111u, 0x00019900u, 0x00001990u, 0x00000000u, 0x99410000u, 0x00000000u, 0x00011499u, 0x11114900u, 0x00000094u, 0x00114990u, 0x11149000u, 0x90000941u, 0x19900019u, 0x99410000u, 0x00000000u, 0x00011499u, 0x11114900u, 0x99000094u, 0x19900001u, 0x99410000u, 0x00000000u, 0x00011499u, 0x11149000u, 0x99000941u, 0x19900001u, 0x41940000u, 0x00001499u, 0x11100000u, 0x00000000u, 0x00001110u, 0x10000000u, 0x11000001u, 0x01100000u, 0x00011000u, 0x00001100u, 0x00000000u, 0x11000000u, 0x00000001u, 0x00000111u, 0x00011000u, 0x00000111u, 0x00001110u, 0x00011000u, 0x00001110u, 0x11000011u, 0x01100000u, 0x00000000u, 0x00000110u, 0x00001100u, 0x10000110u, 0x11000001u, 0x11000000u, 0x00000001u, 0x00000111u, 0x01111000u, 0x10001110u, 0x11000001u,
+    0x11100000u, 0x00000111u, 0x18860000u, 0x40000000u, 0x49999999u, 0x99994000u, 0x40004999u, 0x49999999u, 0x99994000u, 0x30004999u, 0x03999997u, 0x99999700u, 0x97009999u, 0x99999999u, 0x99999700u, 0x00009999u, 0x00079930u, 0x99300000u, 0x00000007u, 0x00079930u, 0x99963000u, 0x30000369u, 0x03699996u, 0x99963000u, 0x30000369u, 0x03699996u, 0x00099300u, 0x93000960u, 0x09600009u, 0x00099300u, 0x93000960u, 0x09600009u, 0x01796000u, 0x00009970u, 0x16886000u, 0x94000000u, 0x14999999u, 0x99999400u, 0x94001499u, 0x14999999u, 0x99999400u, 0x73001499u, 0x07999999u, 0x99999000u, 0x90001999u, 0x19999999u, 0x99999000u, 0x00001999u, 0x00139940u, 0x99400000u, 0x00000013u, 0x00139940u, 0x99999300u, 0x93001699u, 0x16999999u, 0x99999300u, 0x93001699u, 0x16999999u, 0x00169600u, 0x96001990u, 0x19900016u, 0x00169600u, 0x96001990u, 0x19900016u, 0x17999000u, 0x00005993u, 0x11688863u, 0x30000000u, 0x11194149u, 0x41493000u, 0x30001119u, 0x11194149u, 0x41493000u, 0x97301119u,
+    0x11111116u, 0x11199300u, 0x93001111u, 0x11111119u, 0x11199300u, 0x00001111u, 0x00119970u, 0x99700000u, 0x00000011u, 0x00119970u, 0x11369930u, 0x99301993u, 0x19931136u, 0x11369930u, 0x99301993u, 0x19931136u, 0x00139930u, 0x99301990u, 0x19900013u, 0x00139930u, 0x99301990u, 0x19900013u, 0x79999300u, 0x00003995u, 0x01168886u, 0x83000000u, 0x01384114u, 0x41148300u, 0x83000138u, 0x01384114u, 0x41148300u, 0x68700138u, 0x11100111u, 0x88888700u, 0x87001178u, 0x11788888u, 0x88888700u, 0x00001178u, 0x00117870u, 0x78700000u, 0x00000011u, 0x00117870u, 0x11136860u, 0x68601881u, 0x18811113u, 0x11136860u, 0x68601881u, 0x18811113u, 0x00116860u, 0x68601880u, 0x18800011u, 0x00116860u, 0x68601880u, 0x18800011u, 0x98898600u, 0x00003688u, 0x30111377u, 0x77300077u, 0x01777777u, 0x77777730u, 0x77300177u, 0x01777777u, 0x77777730u, 0x17730177u, 0x36630011u, 0x77777730u, 0x77300117u, 0x01177777u, 0x77777730u, 0x00000117u, 0x00014773u, 0x47730000u, 0x00000001u, 0x00014773u,
+    0x00113773u, 0x37731773u, 0x17730011u, 0x00113773u, 0x37731773u, 0x17730011u, 0x00113773u, 0x37731773u, 0x17730011u, 0x00113773u, 0x37731773u, 0x17730011u, 0x87377730u, 0x00001588u, 0x63013666u, 0x66630166u, 0x13666666u, 0x66666663u, 0x66631366u, 0x13666666u, 0x66666663u, 0x55531366u, 0x11555555u, 0x11116660u, 0x66600111u, 0x01111111u, 0x11116660u, 0x00000111u, 0x00012666u, 0x26660000u, 0x00000001u, 0x00012666u, 0x30011666u, 0x16661366u, 0x13663001u, 0x30011666u, 0x16661366u, 0x13663001u, 0x30111666u, 0x16661666u, 0x16663011u, 0x30111666u, 0x16661666u, 0x16663011u, 0x73116660u, 0x00001388u, 0x44444441u, 0x25550114u, 0x15541111u, 0x11112555u, 0x25551554u, 0x15541111u, 0x11112555u, 0x44311554u, 0x01134444u, 0x55555553u, 0x55531355u, 0x13555555u, 0x55555553u, 0x00001355u, 0x00011555u, 0x15550000u, 0x00000001u, 0x00011555u, 0x55555553u, 0x55531135u, 0x11355555u, 0x55555553u, 0x55531135u, 0x11355555u, 0x55555553u, 0x55531355u, 0x13555555u, 0x55555553u,
+    0x55531355u, 0x13555555u, 0x31113553u, 0x00001167u, 0x34444310u, 0x12440011u, 0x14410001u, 0x00011244u, 0x12441441u, 0x14410001u, 0x00011244u, 0x11101441u, 0x00111141u, 0x44444444u, 0x44441134u, 0x11344444u, 0x44444444u, 0x00001134u, 0x00011444u, 0x14440000u, 0x00000001u, 0x00011444u, 0x44444431u, 0x44310113u, 0x01134444u, 0x44444431u, 0x44310113u, 0x01134444u, 0x44444431u, 0x44311134u, 0x11344444u, 0x44444431u, 0x44311134u, 0x11344444u, 0x10111444u, 0x00001133u, 0x11111100u, 0x11100001u, 0x11100000u, 0x00001110u, 0x11101110u, 0x11100000u, 0x00001110u, 0x30001110u, 0x00000133u, 0x11111110u, 0x11100111u, 0x01111111u, 0x11111110u, 0x00000111u, 0x00001111u, 0x11110000u, 0x00000000u, 0x00001111u, 0x11111110u, 0x11100011u, 0x00111111u, 0x11111110u, 0x11100011u, 0x00111111u, 0x11111110u, 0x11100111u, 0x01111111u, 0x11111110u, 0x11100111u, 0x01111111u, 0x00011110u, 0x00001111u,
+};
+
+/* Descriptor pool reset ends the current font borrow */
+void text_renderer_resource_reset(void)
+{
+    g_text_renderer.font = 0;
+    resource_table_register(FONT_RESOURCE, (void *)font_resource, sizeof(font_resource), RESOURCE_BORROW);
+}
+
+/* Original font metrics and descriptor bind */
+/* Original: FUN_8008ECDC. */
+static void text_font_state_init(void)
+{
+    g_text_renderer.glyph_width = 0xc;
+    g_text_renderer.glyph_height = 0xc;
+    g_text_renderer.line_height = 0xd;
+    g_text_renderer.font = spr_vram_desc_for_resource(FONT_RESOURCE);
+    g_text_renderer.clut = g_spr_pal.cluts[FONT_RESOURCE >> 10];
+    g_text_renderer.columns = 0x100 / 0xc;
+}
+
+/* Original font palette upload and sprite descriptors */
+/* Original: FUN_8008BE98. */
+GDB_CALL void text_font_init(void)
+{
+    g_spr_pal.cluts[FONT_RESOURCE >> 10] = spr_clut_upload(FONT_RESOURCE, 0);
+    spr_create_vram_descs(FONT_RESOURCE, 1, g_spr_pal.cluts[FONT_RESOURCE >> 10], 0);
+    text_font_state_init();
+}
+
+typedef struct
+{
+    uint16 code;
+    sint16 glyph;
+} SJIS_GLYPH;
+
+typedef struct
+{
+    uint8 r, g, b;
+} TEXT_COLOR;
+
+/* Original data: SLES_004.74:0x800CDA64..0x800CDAA5 */
+static const uint16 special_glyphs[33] = {
+    33088, 33097, 33128, 33172, 33168, 33171, 33173, 33126, 33129, 33130, 33174, 33147, 33091, 33148, 33092, 33118, 33094, 33095, 33137, 33153, 33138, 33096, 33175, 33133, 33167, 33134, 33103, 33105, 33125, 33135, 33122, 33136, 33104,
+};
+
+/* Original data: SLES_004.74:0x800C83FC..0x800C8437 */
+static const uint8 single_byte_glyphs[60] = {
+    95, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 96, 97, 98, 99, 0, 100, 0, 0, 101, 102, 103, 104, 0, 0, 105, 106, 107, 0, 116, 108, 109, 110, 0, 111, 0, 0, 112, 113, 114, 115,
+};
+
+/* Original data: SLES_004.74:0x800C8450..0x800C879B */
+static const SJIS_GLYPH sjis_glyphs[211] = {
+    {0x82a0, 0},   {0x82a2, 1},   {0x82a4, 2},   {0x82a6, 3},   {0x82a8, 4},   {0x82a9, 5},   {0x82ab, 6},   {0x82ad, 7},   {0x82af, 8},   {0x82b1, 9},   {0x82b3, 10},  {0x82b5, 11},  {0x82b7, 12},  {0x82b9, 13},  {0x82bb, 14},  {0x82bd, 15},  {0x82bf, 16},  {0x82c2, 17},  {0x82c4, 18},  {0x82c6, 19},  {0x8141, 20},  {0x82c8, 21},  {0x82c9, 22},  {0x82cc, 23},  {0x82cd, 24},  {0x82d6, 25},  {0x82d9, 26},  {0x82dc, 27},  {0x82dd, 28},  {0x82de, 29},  {0x82df, 30},  {0x82e0, 31},  {0x82e2, 32},  {0x82e6, 33},  {0x82e7, 34},  {0x82e8, 35},  {0x82e9, 36},  {0x82ea, 37},  {0x82eb, 38},  {0x82ed, 39},  {0x82f1, 40},  {0x82f0, 41},  {0x82e3, 42},  {0x82c1, 43},  {0x8142, 44},  {0x82aa, 45},  {0x82ac, 46},  {0x82ae, 47},  {0x82b8, 48},  {0x82be, 49},  {0x82c3, 50},  {0x82c5, 51},  {0x82ce, 52},
+    {0x82d1, 53},  {0x82d4, 54},  {0x82d7, 55},  {0x8341, 56},  {0x8343, 57},  {0x8345, 58},  {0x8347, 59},  {0x8349, 60},  {0x834a, 61},  {0x834e, 62},  {0x8350, 63},  {0x8352, 64},  {0x8354, 65},  {0x8356, 66},  {0x8358, 67},  {0x835a, 68},  {0x835e, 69},  {0x8360, 70},  {0x8365, 71},  {0x8367, 72},  {0x8369, 73},  {0x836a, 74},  {0x836c, 75},  {0x836d, 76},  {0x8374, 77},  {0x837d, 78},  {0x837e, 79},  {0x8380, 80},  {0x8381, 81},  {0x8382, 82},  {0x8384, 83},  {0x8386, 84},  {0x8389, 85},  {0x838a, 86},  {0x838b, 87},  {0x838c, 88},  {0x838d, 89},  {0x838f, 90},  {0x8393, 91},  {0x8370, 92},  {0x8376, 93},  {0x8379, 94},  {0x837c, 95},  {0x834b, 96},  {0x834f, 97},  {0x8351, 98},  {0x8357, 99},  {0x835f, 100}, {0x8366, 101}, {0x8368, 102}, {0x836f, 103}, {0x8375, 104}, {0x837b, 105},
+    {0x8340, 106}, {0x8362, 107}, {0x8383, 108}, {0x8385, 109}, {0x8387, 110}, {0x8346, 111}, {0x90d4, 112}, {0x898c, 113}, {0x91ab, 114}, {0x88c8, 115}, {0x895e, 116}, {0x8c8a, 117}, {0x8c82, 118}, {0x8a6d, 119}, {0x8b90, 120}, {0x9788, 121}, {0x8b7e, 122}, {0x8bf3, 123}, {0x8c9a, 124}, {0x8a43, 125}, {0x8acd, 126}, {0x8d73, 127}, {0x8afa, 128}, {0x89bb, 129}, {0x8a4a, 130}, {0x8aae, 131}, {0x8cfb, 132}, {0x8ac7, 133}, {0x8c76, 134}, {0x89e6, 135}, {0x8c52, 136}, {0x8cc9, 137}, {0x8c4e, 138}, {0x8ce3, 139}, {0x8aed, 140}, {0x89c8, 141}, {0x8a77, 142}, {0x8a69, 143}, {0x8cb4, 144}, {0x8bdf, 145}, {0x8bad, 146}, {0x8d55, 147}, {0x90dd, 148}, {0x90ed, 149}, {0x8f6f, 150}, {0x90f6, 151}, {0x9085, 152}, {0x8db8, 153}, {0x8fea, 154}, {0x91b1, 155}, {0x8eb8, 156}, {0x90ac, 157}, {0x9069, 158},
+    {0x8f89, 159}, {0x8fe3, 160}, {0x8f91, 161}, {0x8e6e, 162}, {0x8e67, 163}, {0x90da, 164}, {0x9171, 165}, {0x8ee8, 166}, {0x9056, 167}, {0x9197, 168}, {0x8fee, 169}, {0x8ecb, 170}, {0x8ed2, 171}, {0x906c, 172}, {0x8e91, 173}, {0x91e5, 174}, {0x9286, 175}, {0x92f8, 176}, {0x92b2, 177}, {0x91e6, 178}, {0x939b, 179}, {0x9245, 180}, {0x9265, 181}, {0x925b, 182}, {0x8e71, 183}, {0x91cc, 184}, {0x9446, 185}, {0x9443, 186}, {0x93ef, 187}, {0x93fc, 188}, {0x945b, 189}, {0x9473, 190}, {0x94ad, 191}, {0x949a, 192}, {0x94f0, 193}, {0x967b, 194}, {0x95db, 195}, {0x95aa, 196}, {0x9562, 197}, {0x95ba, 198}, {0x95f1, 199}, {0x96df, 200}, {0x96b1, 201}, {0x96ca, 202}, {0x97ce, 203}, {0x95a8, 204}, {0x9696, 205}, {0x9741, 206}, {0x97b9, 207}, {0x979d, 208}, {0x97bf, 209}, {0xffff, 255},
+};
+
+/* Original data: SLES_004.74:0x800C8438..0x800C844F */
+static const TEXT_COLOR text_colors[8] = {
+    {127, 127, 127}, {127, 0, 0}, {0, 127, 0}, {0, 0, 127}, {127, 127, 0}, {64, 64, 127}, {127, 0, 127}, {0, 0, 0},
+};
 
 /* Functions. */
-static sint32 div2_trunc(sint32 value)
-{
-    return value < 0 ? (value + 1) / 2 : value / 2;
-}
-
-static sint32 div4_trunc(sint32 value)
-{
-    return value < 0 ? (value + 3) / 4 : value / 4;
-}
-
 /* Original: FUN_8008EDEC. */
-sint32 text_byte_length(const char *text)
+sint32 text_byte_len(const char *text)
 {
     return (sint32)strlen(text);
 }
 
 /* Original: FUN_800AFF18. */
-uint32 text_decode_single_byte_glyph(uint32 code)
+static uint32 text_decode_single_byte_glyph(uint32 code)
 {
-    const uint16 *special = (const uint16 *)player_assets_executable_address(0x800cda64u);
-    sint32 index;
-    for (index = 0; index < 0x21; index++)
-        if ((code & 0xffffu) == special[index])
-            return (uint32)(index + 0x20);
+    sint32 idx;
+    for (idx = 0; idx < 0x21; idx++)
+        if ((code & 0xffffu) == special_glyphs[idx])
+            return (idx + 0x20);
     if (((code + 0x7db1u) & 0xffffu) < 10u)
         return (code + 0xe1u) & 0xffu;
     if (((code + 0x7da0u) & 0xffffu) < 0x1au)
@@ -43,115 +182,117 @@ uint32 text_decode_single_byte_glyph(uint32 code)
 }
 
 /* Original: FUN_8008EE0C. */
-uint32 text_decode_sjis_glyph(uint16 code)
+static sint16 text_decode_sjis_glyph(uint16 code)
 {
-    const sint16 *entry = (const sint16 *)player_assets_executable_address(0x800c8450u);
+    const SJIS_GLYPH *entry = sjis_glyphs;
     uint32 converted = text_decode_single_byte_glyph(code) & 0xffu;
     if (converted != 0)
         return converted;
-    while ((uint16)entry[0] != 0xffffu)
+    while (entry->code != 0xffffu)
     {
-        if ((uint16)entry[0] == code)
-            return (uint32)(sint16)(entry[1] + g_font_glyph_columns * 4 + 0x21);
-        entry += 2;
+        if (entry->code == code)
+            return entry->glyph + g_text_renderer.columns * 4 + 0x21;
+        ++entry;
     }
-    fatal_error_with_value("SJIS NOT FOUND", code);
+    fatal_error_with_val("SJIS NOT FOUND", code);
     return 0;
 }
 
-static void set_text_color(SPRT *packet, uint32 index)
+static void set_text_color(SPRT *packet, uint32 idx)
 {
-    const uint8 *rgb = (const uint8 *)player_assets_executable_address(0x800c8438u + index * 3u);
-    packet->rgbc.r = rgb[0];
-    packet->rgbc.g = rgb[1];
-    packet->rgbc.b = rgb[2];
+    if (idx >= sizeof(text_colors) / sizeof(text_colors[0]))
+    {
+        fatal_error_with_val("TEXT COLOR", idx);
+        abort();
+    }
+    setRGB0(packet, text_colors[idx].r, text_colors[idx].g, text_colors[idx].b);
 }
 
-static void submit_font_mode(const FONT *font)
+static void submit_font_mode(const VRAM_SPRITE *font)
 {
+    RENDER_PACKET_ARENA *arena = g_gpu_packets;
     DR_MODE mode;
     DR_MODE *copy;
     SetDrawMode(&mode, 0, 0, font->tpage, 0);
-    copy = (DR_MODE *)g_gpu_packet_cursor;
+    XASSERT(!(arena == 0 || arena->used > RENDER_PRIM_CAPACITY || sizeof(mode) > RENDER_PRIM_CAPACITY - arena->used));
+    copy = (DR_MODE *)(arena->data.bytes + arena->used);
     memcpy(copy, &mode, sizeof(mode));
-    AddPrim(g_current_render_frame->ot + 1, copy);
-    g_gpu_packet_cursor += sizeof(mode);
+    AddPrim(g_cur_render_frame->ot + 1, copy);
+    arena->used += sizeof(mode);
 }
 
-static sint32 centered_line_width(const uint8 *text)
+static sint16 centered_line_width(const uint8 *text)
 {
-    uint32 consumed = 0;
+    uint8 consumed = 0;
     sint32 width = 0;
     while (text[consumed] != 0 && text[consumed] != '\n')
     {
         uint8 c = text[consumed];
-        if ((uint8)(c + 0x7f) < 0x20u || (c & 0xf8u) == 0x98u)
+        if ((c >= 0x81 && c < 0xa1) || (c & 0xf8u) == 0x98u)
         {
             consumed += 2;
-            width += g_font_glyph_width;
+            width += g_text_renderer.glyph_width;
         }
         else
         {
             if (c == ' ')
-                width += div2_trunc(g_font_glyph_width) + div4_trunc(g_font_glyph_width);
+                width += g_text_renderer.glyph_width / 2 + g_text_renderer.glyph_width / 4;
             else
-                width += g_font_glyph_width;
+                width += g_text_renderer.glyph_width;
             consumed += 1;
         }
     }
-    return (sint16)width;
+    return width;
 }
 
 /* Original: FUN_8008EECC. */
-GDB_CALL void text_render(const char *source, sint32 initial_x, sint32 initial_y)
+GDB_CALL void text_render(const char *src, sint16 initial_x, sint16 initial_y)
 {
-    uint8 *text = (uint8 *)source;
-    FONT *font = g_font;
+    RENDER_PACKET_ARENA *arena = g_gpu_packets;
+    const uint8 *text = (const uint8 *)src;
+    const VRAM_SPRITE *font = g_text_renderer.font;
     SPRT packet;
-    sint32 pen_x = (sint16)initial_x;
-    sint32 pen_y = (sint16)initial_y + 0x40;
-    sint32 initial_color = g_text_color_index;
+    sint16 pen_x = initial_x;
+    sint16 pen_y = initial_y + 0x40;
+    sint32 initial_color = g_text_renderer.color_idx;
+    XASSERT(!(font == 0 || g_text_renderer.columns == 0));
     SetSprt(&packet);
-    set_text_color(&packet, (uint32)initial_color);
-    g_text_color_index = (sint16)(g_text_color_index * 3);
-    packet.w = (sint16)g_font_glyph_width;
-    packet.h = (sint16)g_font_glyph_height;
-    packet.p[0].xy.x = (sint16)pen_x;
-    packet.p[0].xy.y = (sint16)pen_y;
-    packet.p[0].uv.u = (uint8)font->u0;
-    packet.p[0].uv.v = (uint8)font->v1;
-    packet.p[0].attr = (uint16)g_font_clut;
+    set_text_color(&packet, initial_color);
+    g_text_renderer.color_idx = (g_text_renderer.color_idx * 3);
+    packet.w = g_text_renderer.glyph_width;
+    packet.h = g_text_renderer.glyph_height;
+    packet.p[0].xy.x = pen_x;
+    packet.p[0].xy.y = pen_y;
+    packet.p[0].uv.u = font->u0;
+    packet.p[0].uv.v = font->v1;
+    packet.p[0].attr = g_text_renderer.clut;
 
     for (;;)
     {
-        uint32 code = *text++;
+        sint16 code = *text++;
         sint32 sjis = 0;
         if (code == 0)
             break;
-        if ((code - 0x81u) < 0x20u || (code & 0xf8u) == 0x98u)
+        if ((code >= 129u && code < 161u) || (code & 0xf8u) == 0x98u)
         {
-            uint8 first = (uint8)code;
+            uint8 first = code;
             --text;
             if ((first & 0xf8u) == 0x98u)
-                code = ((uint32)first << 8 | text[1]) & 0x7ffu;
+                code = (first << 8 | text[1]) & 0x7ff;
             else
             {
-                code = text_decode_sjis_glyph((uint16)((uint32)first << 8 | text[1]));
-                text[0] = (uint8)(((sint16)code + 0x9800) >> 8);
-                text[1] = (uint8)code;
+                code = text_decode_sjis_glyph(first << 8 | text[1]);
             }
             sjis = 1;
             text += 2;
         }
         if (!sjis && ((code - 0xa1u) & 0xffffu) < 0x3cu)
         {
-            const uint8 *map = (const uint8 *)player_assets_executable_address(0x800c835bu + (sint16)code);
-            code = *map;
+            code = single_byte_glyphs[code - 0xa1u];
         }
-        code = (uint32)(sint16)code;
         if (code == ' ')
         {
-            pen_x += div2_trunc(g_font_glyph_width) + div4_trunc(g_font_glyph_width);
+            pen_x += g_text_renderer.glyph_width / 2 + g_text_renderer.glyph_width / 4;
             continue;
         }
         if (code == 0x0c)
@@ -161,22 +302,23 @@ GDB_CALL void text_render(const char *source, sint32 initial_x, sint32 initial_y
         }
         if (code == '\n')
         {
-            pen_y += g_font_line_height;
-            pen_x = (sint16)initial_x;
+            pen_y += g_text_renderer.line_height;
+            pen_x = initial_x;
             continue;
         }
         if (code == '\r')
             continue;
         if (code == 0x10)
         {
-            uint32 resource = (uint32)text[0] | (uint32)text[1] << 8 | (uint32)text[2] << 16 | (uint32)text[3] << 24;
+            uint32 resource = text[0] | text[1] << 8 | text[2] << 16 | (uint32)text[3] << 24;
             uint8 *frame;
             text += 4;
             submit_font_mode(font);
             frame = animation_frame_resource(resource);
-            pen_x += (uint32)frame[0] >> 1;
-            render_screen_sprite((sint16)pen_x, (sint16)(pen_y + g_font_glyph_height), resource, 1);
-            pen_x += (uint32)frame[0] >> 1;
+            XASSERT(!(frame == 0));
+            pen_x += frame[0] >> 1;
+            render_scr_spr(pen_x, pen_y + (sint16)g_text_renderer.glyph_height, resource, 1);
+            pen_x += frame[0] >> 1;
             continue;
         }
         if (code == 0x11)
@@ -186,30 +328,31 @@ GDB_CALL void text_render(const char *source, sint32 initial_x, sint32 initial_y
         }
         if (code == 0x13)
         {
-            if ((uint16)(pen_y + 0xd5) < 0x1abu)
-                pen_x = -div2_trunc(centered_line_width(text));
+            if (pen_y >= -0xd5 && pen_y < 0xd6)
+                pen_x = -(centered_line_width(text) / 2);
             continue;
         }
-        if ((sint16)code > 0x1f)
+        if (code > 0x1f)
         {
-            if ((uint16)(pen_y + 0xd5) < 0x1abu)
+            if (pen_y >= -0xd5 && pen_y < 0xd6)
             {
-                sint32 glyph = (sint16)code - 0x21;
+                sint32 glyph = code - 0x21;
                 SPRT *copy;
-                packet.p[0].uv.v = (uint8)(font->v0 + (glyph / g_font_glyph_columns) * g_font_glyph_height);
-                packet.p[0].uv.u = (uint8)(font->u0 + (glyph % g_font_glyph_columns) * g_font_glyph_width);
-                packet.p[0].xy.x = (sint16)pen_x;
-                packet.p[0].xy.y = (sint16)pen_y;
-                copy = (SPRT *)g_gpu_packet_cursor;
+                packet.p[0].uv.v = (font->v0 + (glyph / g_text_renderer.columns) * g_text_renderer.glyph_height);
+                packet.p[0].uv.u = (font->u0 + (glyph % g_text_renderer.columns) * g_text_renderer.glyph_width);
+                packet.p[0].xy.x = pen_x;
+                packet.p[0].xy.y = pen_y;
+                XASSERT(!(arena == 0 || arena->used > RENDER_PRIM_CAPACITY || sizeof(packet) > RENDER_PRIM_CAPACITY - arena->used));
+                copy = (SPRT *)(arena->data.bytes + arena->used);
                 memcpy(copy, &packet, sizeof(packet));
-                psx_set_prim_screen_offset(160, 64);
-                AddPrim(g_current_render_frame->ot + 1, copy);
-                g_gpu_packet_cursor += sizeof(packet);
+
+                AddPrim(g_cur_render_frame->ot + 1, copy);
+                arena->used += sizeof(packet);
             }
-            pen_x += g_font_glyph_width;
+            pen_x += (sint16)g_text_renderer.glyph_width;
         }
     }
     submit_font_mode(font);
-    g_text_color_index = 0;
-    g_text_pen_y = (sint16)pen_y;
+    g_text_renderer.color_idx = 0;
+    g_text_renderer.pen_y = pen_y;
 }

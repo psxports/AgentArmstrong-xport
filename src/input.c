@@ -1,100 +1,63 @@
-#include <stdlib.h>
-#include "global.h"
-#include "object.h"
-#include "psx.h"
-#include "psx.h"
+#include <string.h>
 
-static sint32 text_equal_ignore_case(const char *left, const char *right)
+#include "input.h"
+
+sint32 g_debug_cheats_enabled;
+
+__declspec(dllexport) INPUT_STATE g_input;
+static sint32 direct_pad_initialized;
+
+/* Exact predicate at 0x800AEED4..0x800AEF5C. */
+/* Original: FUN_800AEED4. */
+sint16 pad_packet_is_digital_pad(const uint8 *packet)
 {
-    uint8 a;
-    uint8 b;
-    do
-    {
-        a = (uint8)*left++;
-        b = (uint8)*right++;
-        if (a >= 'A' && a <= 'Z')
-            a = (uint8)(a + ('a' - 'A'));
-        if (b >= 'A' && b <= 'Z')
-            b = (uint8)(b + ('a' - 'A'));
-        if (a != b)
-            return 0;
-    } while (a != 0);
-    return 1;
+    if (packet[0] == 0xff)
+        return 0;
+    return ((packet[1] >> 4) == 4);
 }
 
-GDB_CALL uint32 controllers_read(sint32 controller)
+/* The application owns registration and communication for both reports */
+void input_release(void)
 {
-    static sint32 direct_pad_initialized;
-    uint32 buttons = 0;
-    /* The PSX routine ignored its argument and packed pads 1/2 into the low
-     * and high 16 bits.  Hold Right Shift to route the I/J/K/L face-button
-     * cluster to pad 2; the original cheat sequences contain pad-2 masks. */
+    if (direct_pad_initialized != 0)
+        PadStopCom();
+    direct_pad_initialized = 0;
+    memset(&g_input, 0, sizeof(g_input));
+}
 
-    if (!direct_pad_initialized)
+/* Original: SLES_004.74:FUN_800AED64. */
+GDB_CALL uint32 pads_read(void)
+{
+    uint16 buttons0, buttons1, report;
+    uint32 buttons;
+    if (direct_pad_initialized == 0)
     {
-        PadInitDirect(g_controller_packet, 0);
+        PadInitDirect(g_input.packet[0], g_input.packet[1]);
         PadStartCom();
         direct_pad_initialized = 1;
     }
-
-    if (getenv("OA_MUZZLE_LIGHT_TRACE") != 0)
+    buttons0 = PadRead(0);
+    buttons1 = PadRead(1);
+    /* Match the shared host digital transport's packet byte order */
+    report = ~buttons0;
+    pad_publish(0, 1, ((report >> 8) | (report << 8)));
+    report = ~buttons1;
+    pad_publish(1, 1, ((report >> 8) | (report << 8)));
+    if (pad_packet_is_digital_pad(g_input.packet[0]) == 0)
     {
-        /* Audit-only deterministic Square hold used by the paired native
-         * muzzle-light CDB capture. */
-        buttons = PADRleft;
+        g_input.packet[0][2] = g_input.packet[0][3] = 0xff;
+        buttons0 = 0;
     }
-    else if (getenv("OA_COMPLETION_TRACE") != 0)
+    if (pad_packet_is_digital_pad(g_input.packet[1]) == 0)
     {
-        /* Deterministic audit input only: hold Circle for the flare, then
-         * navigate the original completion menu and confirm its requested
-         * branch.  No completion state is written here. */
-        static sint32 reads, menu_wait, menu_presses, release, confirmed;
-        const char *mode = getenv("OA_COMPLETION_TRACE");
-        if (g_player == 0 || g_effect_count != 109)
-        {
-            buttons = 0;
-        }
-        else if (reads < 180)
-            buttons = PADRright;
-        else if (g_next_stage_index != 0)
-        {
-            sint32 wanted = text_equal_ignore_case(mode, "hq") ? 2 : 1;
-            /* Let FUN_800894b4 establish its initial selection and input
-             * baseline before producing any menu edge. */
-            if (menu_wait < 16)
-                ++menu_wait;
-            else if (release)
-                release = 0;
-            else if (menu_presses < wanted)
-            {
-                buttons = PADLdown;
-                ++menu_presses;
-                release = 1;
-            }
-            else if (!confirmed)
-            {
-                buttons = PADRdown;
-                confirmed = 1;
-            }
-        }
-        if (g_player != 0 && g_effect_count == 109)
-            ++reads;
+        g_input.packet[1][2] = g_input.packet[1][3] = 0xff;
+        buttons1 = 0;
     }
-    else if (getenv("OA_MISSION_LAUNCH_TRACE") != 0)
-    {
-        static sint32 reads;
-        if ((reads >= 5 && reads < 9) || (reads >= 180 && reads < 184) || (reads >= 260 && reads < 264))
-            buttons = PADRdown;
-        ++reads;
-    }
-    else
-        buttons = PadRead(controller);
-
-    /* Preserve the original conflict resolution from FUN_800AED64. */
+    buttons = buttons0 | (uint32)buttons1 << 16;
+    /* Original direction priority applies only to the first controller */
     if (buttons & PADLleft)
         buttons &= ~PADLright;
     if (buttons & PADLdown)
         buttons &= ~PADLup;
-    pad_publish(0, 1, (uint16)~buttons);
     return buttons;
 }

@@ -1,15 +1,12 @@
-#ifndef MODULE_API_GAME_FILE_H
-#define MODULE_API_GAME_FILE_H
+#ifndef GAME_FILE_H
+#define GAME_FILE_H
 
 #include "xport.h"
-#include "psx.h"
 
-/* BEGIN GENERATED MODULE API */
-sint32 app_file_read(const char *path, void *destination, sint32 capacity, sint32 *size_out);
-sint32 app_file_size(const char *path);
+GDB_CALL sint32 game_file_size(const char *path);
+GDB_CALL void game_file_read(const char *path, void *dst, sint32 capacity);
+sint32 game_file_write(const char *path, const void *data, sint32 size);
+void *game_file_load(const char *path, sint32 *size_out);
 sint32 app_file_write(const char *path, const void *data, sint32 size);
-void *app_file_load(const char *path, sint32 *size_out);
-void app_file_free(void *data);
-/* END GENERATED MODULE API */
 
 #endif

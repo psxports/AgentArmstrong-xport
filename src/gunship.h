@@ -1,5 +1,5 @@
-#ifndef OPEN_ARMSTRONG_GUNSHIP_H
-#define OPEN_ARMSTRONG_GUNSHIP_H
+#ifndef GUNSHIP_H
+#define GUNSHIP_H
 
 #include "xport.h"
 #include "psx.h"
@@ -12,5 +12,9 @@
 /* BEGIN GENERATED MODULE API */
 void gunship_create(EFFECT *e);
 /* END GENERATED MODULE API */
+
+extern sint16 g_gunship_model_base;
+
+extern MODEL_POSE_RESOURCE g_gunship_initial_pose;
 
 #endif

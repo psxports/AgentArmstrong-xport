@@ -5,8 +5,8 @@
 #include "psx.h"
 
 /* BEGIN GENERATED MODULE API */
-GDB_CALL sint32 random_range(sint32 maximum);
-sint32 secondary_random_range(sint32 maximum);
+GDB_CALL uint16 random_range(sint32 maximum);
+uint16 secondary_random_range(sint32 maximum);
 /* END GENERATED MODULE API */
 
 #endif

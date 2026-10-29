@@ -1,19 +1,109 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+
+#include "game_math.h"
+#include "map.h"
 #include "psx_gpu.h"
 #include "game_sound.h"
-#include "global.h"
-#include "memory_card_platform.h"
+#include "game.h"
+#include "map_render.h"
+#include "input_record.h"
 #include "mission.h"
 #include "object.h"
-#include "original_file.h"
+#include "game_file.h"
 #include "game_runtime.h"
 #include "input.h"
 #include "player.h"
 #include "psx.h"
 #include "render.h"
-#include "stubs.h"
+#include "sprite.h"
+#include "runtime_heap.h"
 #include "text_renderer.h"
+
+/* Original: FUN_80088DC0. */
+GDB_CALL void fatal_error(const char *message)
+{
+    DrawSync(0);
+    while (!xport_isquit() && pads_read() != 0)
+        vertical_sync_wait(0);
+    while (!xport_isquit() && pads_read() == 0)
+    {
+        RENDER_FRAME *frame;
+        ++g_render_state.frame;
+        frame = &g_render_frames[(g_render_state.frame & 1) ? 0 : 1];
+        g_cur_render_frame = frame;
+        g_gpu_packets = &frame->packets;
+        g_gpu_packets->used = 0;
+        ClearOTag(frame->ot, RENDER_OT_LENGTH);
+        g_text_renderer.color_idx = 1;
+        text_render(message, -0x8c, 0);
+        DrawSync(0);
+        vertical_sync_wait(0);
+        PutDrawEnv(&frame->drawenv);
+        PutDispEnv(&frame->disp_env);
+        ot_submit(frame->ot);
+    }
+    while (!xport_isquit() && pads_read() != 0)
+        vertical_sync_wait(0);
+}
+
+/* Original: FUN_80088EFC. */
+void fatal_error_with_val(const char *prefix, sint32 val)
+{
+    char message[40];
+    snprintf(message, sizeof(message), "%s%s", prefix, integer_to_text(val));
+    fatal_error(message);
+}
+
+static sint32 g_screenshot_idx;
+
+static sint32 g_debug_coords_visible;
+
+/* Originals: DAT_800D41EC, DAT_800D3E6C, DAT_800D3F90, DAT_800D3FD2 */
+/* Originals: DAT_800D41A0, DAT_800E2DC8, DAT_800E3398 */
+RENDER_STATE g_render_state;
+
+/* Original: FUN_800AEC34. */
+void render_vblank_update(void)
+{
+    ++g_render_state.vsyncs_this_frame;
+    ++g_render_state.vsyncs_total;
+    XASSERT(g_cd_file_io_enabled != 0);
+}
+
+/* Original: SLES_004.74:DAT_800D41BC */
+POLY_FT4 g_transient_prims[TRANSIENT_PRIM_LIMIT];
+
+/* Original: SLES_004.74:DAT_800D401C */
+POLY_FT4 *g_next_transient_prim = g_transient_prims;
+
+/* Original: DAT_800EDCB8. */
+/* Original: DAT_800F4520. */
+/* Native array elements 0 and 1 retain the two resident frame identities */
+__declspec(dllexport) RENDER_FRAME g_render_frames[2];
+
+/* Originals: DAT_800D4024, DAT_800D4028, DAT_800D402C */
+RENDER_FRAME *g_cur_render_frame;
+
+/* Original: DAT_800D405C. */
+/* Allocation owner remains independent of the target OT */
+RENDER_PACKET_ARENA *g_gpu_packets;
+
+/* Original: DAT_800D3CF2. */
+uint16 g_render_frame_idx;
+
+/* Original: DAT_800D3CD8. */
+static sint32 pause_active;
+
+/* Original: DAT_800D3E8C. */
+sint16 g_disp_shake_ticks;
+
+/* Original: FUN_800901B8. */
+void disp_shake_start(void)
+{
+    g_disp_shake_ticks = 0x2c;
+}
 
 /* Variables. */
 /* Semantic native-port module; original address comments are preserved. */
@@ -21,14 +111,13 @@
  * signed shake timer divided by two, exactly as the original MIPS does. */
 static const sint8 camera_shake_curve[23] = {0, 1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6, 7, -7, 8, -8, 9, -9, 10, -10, 11, -11};
 
-/* Functions. */
-/* These symbols need to become members of a native RenderFrame structure.
- * Their sizes are not declared until the neighboring memory is mapped. */
-/* primitive allocation cursor base */
-/* ordering table / frame buffer 0 */
-/* ordering table / frame buffer 1 */
-/* current primitive allocation cursor */
+/* Original: FUN_800B1304. */
+GDB_CALL void vertical_sync_wait(sint32 mode)
+{
+    VSync(0);
+}
 
+/* Functions. */
 /* Original: FUN_80088978. */
 GDB_CALL void frame_begin(void)
 {
@@ -36,62 +125,54 @@ GDB_CALL void frame_begin(void)
     RENDER_FRAME *frame;
     psx_begin_frame();
 
-    g_prim_link_workspace[0] = 0;
-    g_prim_link_cursor = g_prim_link_workspace;
-    g_vsync_count_this_frame = 0;
-    g_stage_background_disabled = 0;
+    g_render_state.vsyncs_this_frame = 0;
+    g_map_render.background_disabled = 0;
 
-    g_render_frame_index ^= 1;
-    g_current_render_frame = g_render_frame_index ? &g_render_frame_buffer_0 : &g_render_frame_buffer_1;
-    frame = g_current_render_frame;
-    g_gpu_packet_cursor = frame->prim_area;
+    g_render_frame_idx ^= 1;
+    g_cur_render_frame = &g_render_frames[g_render_frame_idx ^ 1];
+    frame = g_cur_render_frame;
+    g_gpu_packets = &frame->packets;
+    g_gpu_packets->used = 0;
 
     ClearOTagR(frame->ot, RENDER_OT_LENGTH);
-    ++g_frame_counter;
+    ++g_render_state.frame;
 
-    buttons = controllers_read(0);
-    g_held_buttons = buttons;
-    g_pressed_buttons = buttons & ~g_previous_held_buttons;
+    buttons = pads_read();
+    g_input.held = buttons;
+    g_input.pressed = buttons & ~g_input.prev;
 }
 
-/* Exact predicate at 0x800AEED4..0x800AEF5C. */
-/* Original: FUN_800AEED4. */
-sint16 controller_packet_is_digital_pad(const uint8 *packet)
+/* Original: FUN_80088A3C. */
+GDB_CALL void end_frame_submit(sint32 mode)
 {
-    if (packet[0] == 0xff)
-        return 0;
-    return (sint16)((packet[1] >> 4) == 4);
-}
-
-/* Exact 0x800AAE78..0x800AAEC4.  The loop counter lives in s0 while a
- * separate halfword at sp+0x10 is passed to FUN_800AA9DC each iteration. */
-/* Original: FUN_800AAE78. */
-void sound_all_voices_stop(void)
-{
-    sint16 voice;
-    sint16 handle;
-    for (voice = 0; voice < 0x18; voice++)
-    {
-        handle = voice;
-        sound_voice_stop(&handle);
-    }
-    /* gp+0x114 = 0x800D3D9C. */
-    {
-        g_sound_handles_invalidated = 1;
-    }
-}
-
-/* PsyQ/CD platform boundaries used by the literal functions below. */
-/* Original: FUN_800B30F4. */
-GDB_CALL void gpu_draw_sync(sint32 mode)
-{
-}
-
-/* Original: FUN_800B3768. */
-GDB_CALL void drawenv_apply(void *env)
-{
-    DRAWENV *draw_environment = (DRAWENV *)env;
-    gpu_draw_env((uint32)(intptr)draw_environment, draw_environment->clip.x, draw_environment->clip.y);
+    RENDER_FRAME *frame = g_cur_render_frame;
+    /* 80088A4C/80088A54: release deferred VRAM descriptors before sweeping
+     * their heap blocks.  Door entry/exit sprites allocate one descriptor
+     * each, so omitting these calls exhausts/overlaps their dynamic VRAM
+     * regions after the first transition. */
+    spr_vram_release_deferred();
+    runtime_heap_sweep();
+    DrawSync(0);
+    if (g_map_render.spr_subdiv != 0)
+        --g_map_render.spr_subdiv;
+    if (g_render_state.vsyncs_this_frame != 0)
+        g_map_render.spr_subdiv = 0x1e;
+    else
+        VSync(0);
+    if (g_gpu_packets->used >= RENDER_PRIM_CAPACITY)
+        fatal_error("PRIM OVERFLOW");
+    if (mode == 0)
+        frame->drawenv.isbg = 1;
+    g_render_frames[0].disp_env.screen.h = g_render_state.height;
+    g_render_frames[1].disp_env.screen.h = g_render_state.height;
+    PutDispEnv(&frame->disp_env);
+    PutDrawEnv(&frame->drawenv);
+    frame->drawenv.isbg = 0;
+    frame->drawenv.dtd = 0;
+    DrawOTag(&frame->ot[RENDER_OT_LENGTH - 1]);
+    psx_end_frame();
+    g_sound_handles_invalidated = 0;
+    g_input.prev = g_input.held;
 }
 
 /* Native GPU submission boundary. Original 800FDDD4 submits before the
@@ -116,104 +197,75 @@ void cd_audio_play(void)
     CdControl(CdlPlay, 0, 0);
 }
 
-static const char *executable_text(uint32 address)
+/* Screenshot TIM bytes have one private owner, independent of player assets */
+typedef struct
 {
-    return (const char *)player_assets_resolve_address(address);
-}
+    uint32 magic, flags, image_block_size;
+    PSX_RECT rect;
+    uint16 pix[320 * 240];
+} SCREENSHOT_TIM_IMAGE;
 
-/* Direct 0x80090090..0x800901B4.  The PSX used 0x80010000 both as the TIM
- * work area and as the resident OVERBINS/BIGDIVER image, hence the final
- * reload.  A growable native buffer represents that fixed-address region. */
+typedef char SCREENSHOT_TIM_RECTANGLE_AT_0C[offsetof(SCREENSHOT_TIM_IMAGE, rect) == 0x0c ? 1 : -1];
+typedef char SCREENSHOT_TIM_PIXELS_AT_14[offsetof(SCREENSHOT_TIM_IMAGE, pix) == 0x14 ? 1 : -1];
+typedef char SCREENSHOT_TIM_SIZE_25814[sizeof(SCREENSHOT_TIM_IMAGE) == 0x25814 ? 1 : -1];
+
 /* Original: FUN_80090090. */
 static void screenshot_capture(void)
 {
-    enum
-    {
-        SCREENSHOT_WORK_CAPACITY = 397312
-    };
-
-    static uint8 work[SCREENSHOT_WORK_CAPACITY];
-    const char *restore_path = g_scuba_stage_active == 0 ? "COMMON0\\OVERBINS.BIN" : "WATER\\BIGDIVER.BIN";
+    static SCREENSHOT_TIM_IMAGE image;
     PSX_RECT rect;
     char filename[32] = "SSHOT";
-    RENDER_FRAME *frame = g_current_render_frame;
-    SCREENSHOT_TIM_IMAGE *image = (SCREENSHOT_TIM_IMAGE *)work;
+    RENDER_FRAME *frame = g_cur_render_frame;
 
-    strcat(filename, integer_to_text(g_screenshot_index));
+    strcat(filename, integer_to_text(g_screenshot_idx));
     strcat(filename, ".TIM");
-    ++g_screenshot_index;
+    g_screenshot_idx = (g_screenshot_idx + 1u);
 
-    image->magic = 0x10;
-    image->flags = 2;
-    image->image_block_size = 0x2580c;
-    rect.x = frame->display_env.disp.x;
-    rect.y = frame->display_env.disp.y;
+    image.magic = 0x10;
+    image.flags = 2;
+    image.image_block_size = 0x2580c;
+    rect.x = frame->disp_env.disp.x;
+    rect.y = frame->disp_env.disp.y;
     rect.w = 0x140;
     rect.h = 0xf0;
-    image->rectangle.x = rect.x;
-    image->rectangle.y = rect.y;
-    image->rectangle.w = rect.w;
-    image->rectangle.h = rect.h;
-    StoreImage(&rect, (uint32 *)image->pixels);
+    image.rect.x = rect.x;
+    image.rect.y = rect.y;
+    image.rect.w = rect.w;
+    image.rect.h = rect.h;
+    StoreImage(&rect, (uint32 *)image.pix);
     DrawSync(0);
-    game_file_write(filename, work, 0x25814);
-    game_file_read(restore_path, work);
-}
-
-/* The original environments are embedded in the two frame buffers:
- * DRAWENV at +0x1204 and DISPENV at +0x1260. */
-static void set_def_draw_env(DRAWENV *env, sint32 x, sint32 y, sint32 w, sint32 h)
-{
-    env->clip.x = (sint16)x;
-    env->clip.y = (sint16)y;
-    env->clip.w = (sint16)w;
-    env->clip.h = (sint16)h;
-    env->ofs[0] = (sint16)x;
-    env->ofs[1] = (sint16)y;
-    env->dtd = 1;
-    env->dfe = 0;
-    env->isbg = 0;
-}
-
-static void set_def_disp_env(DISPENV *env, sint32 x, sint32 y, sint32 w, sint32 h)
-{
-    env->disp.x = (sint16)x;
-    env->disp.y = (sint16)y;
-    env->disp.w = (sint16)w;
-    env->disp.h = (sint16)h;
-    env->screen.x = 0;
-    env->screen.y = 0;
-    env->screen.w = 0;
-    env->screen.h = 0;
-    env->isinter = 0;
-    env->isrgb24 = 0;
+    game_file_write(filename, &image, sizeof(image));
 }
 
 /* Original: FUN_8008EB88. */
-GDB_CALL void display_buffers_initialize(void)
+GDB_CALL void disp_buffers_initialize(void)
 {
     sint32 half_width;
     sint32 half_height;
-    RENDER_FRAME *first = &g_render_frame_buffer_0;
-    RENDER_FRAME *second = &g_render_frame_buffer_1;
+    RENDER_FRAME *frame0 = &g_render_frames[0];
+    RENDER_FRAME *frame1 = &g_render_frames[1];
 
-    set_def_draw_env(&first->drawenv, 0, 0, g_screen_width, g_screen_height);
-    set_def_disp_env(&first->display_env, 0, g_screen_height, g_screen_width, g_screen_height);
-    set_def_draw_env(&second->drawenv, 0, g_screen_height, g_screen_width, g_screen_height);
-    set_def_disp_env(&second->display_env, 0, 0, g_screen_width, g_screen_height);
+    sint32 packets_registered = gpu_register_packet_range(g_render_frames, sizeof(g_render_frames));
+    XASSERT(packets_registered);
+    (void)packets_registered;
 
-    half_width = g_screen_width / 2;
-    half_height = g_screen_height / 2;
-    first->drawenv.ofs[0] = (sint16)half_width;
-    first->drawenv.ofs[1] = (sint16)(half_height - 0x40);
-    second->drawenv.ofs[0] = (sint16)half_width;
-    second->drawenv.ofs[1] = (sint16)(half_height + g_screen_height - 0x40);
-    first->display_env.screen.y = g_display_screen_y;
-    second->display_env.screen.y = g_display_screen_y;
+    SetDefDrawEnv(&frame0->drawenv, 0, 0, g_render_state.width, g_render_state.height);
+    SetDefDispEnv(&frame0->disp_env, 0, g_render_state.height, g_render_state.width, g_render_state.height);
+    SetDefDrawEnv(&frame1->drawenv, 0, g_render_state.height, g_render_state.width, g_render_state.height);
+    SetDefDispEnv(&frame1->disp_env, 0, 0, g_render_state.width, g_render_state.height);
 
-    ClearOTagR(first->ot, RENDER_OT_LENGTH);
-    ClearOTagR(second->ot, RENDER_OT_LENGTH);
-    g_current_render_frame = first;
+    half_width = g_render_state.width / 2;
+    half_height = g_render_state.height / 2;
+    frame0->drawenv.ofs[0] = half_width;
+    frame0->drawenv.ofs[1] = (half_height - 0x40);
+    frame1->drawenv.ofs[0] = half_width;
+    frame1->drawenv.ofs[1] = (half_height + g_render_state.height - 0x40);
+    frame0->disp_env.screen.y = g_render_state.disp_y;
+    frame1->disp_env.screen.y = g_render_state.disp_y;
+
+    ClearOTagR(frame0->ot, RENDER_OT_LENGTH);
+    ClearOTagR(frame1->ot, RENDER_OT_LENGTH);
+    g_cur_render_frame = frame0;
 }
 
 /* Literal control flow of 0x80089144..0x800894B0.  Only the six low-level
@@ -222,59 +274,65 @@ GDB_CALL void display_buffers_initialize(void)
 sint32 pause_menu_update(void)
 {
     uint32 buttons;
+    if (xport_isquit())
+        goto host_quit;
 
-    if (g_input_recording_mode != 2 && controller_packet_is_digital_pad(g_controller_packet) == 0)
+    if (g_input_rec.mode != INPUT_RECORD_PLAYBACK && pad_packet_is_digital_pad(g_input.packet[0]) == 0)
     {
         sound_all_voices_stop();
         cd_audio_pause();
-        display_buffers_initialize();
-        gpu_draw_sync(0);
-        g_render_frame_index ^= 1;
-        g_current_render_frame = g_render_frame_index ? &g_render_frame_buffer_0 : &g_render_frame_buffer_1;
-        drawenv_apply(&g_current_render_frame->drawenv);
-        text_render(player_assets_executable_text_pointer(0x80082864u), 0, -0x20);
-        text_render(player_assets_executable_text_pointer(0x8008275cu), 0, 0x30);
-        screen_overlay_draw();
-        ot_submit(g_current_render_frame->ot + 1);
-        gpu_draw_sync(0);
-        while (controller_packet_is_digital_pad(g_controller_packet) == 0)
+        disp_buffers_initialize();
+        DrawSync(0);
+        g_render_frame_idx ^= 1;
+        g_cur_render_frame = &g_render_frames[g_render_frame_idx ^ 1];
+        PutDrawEnv(&g_cur_render_frame->drawenv);
+        text_render(g_game_text.entries[137], 0, -0x20);
+        text_render(g_game_text.entries[71], 0, 0x30);
+        scr_overlay_draw();
+        ot_submit(g_cur_render_frame->ot + 1);
+        DrawSync(0);
+        while (pad_packet_is_digital_pad(g_input.packet[0]) == 0)
         {
             do
             {
                 vertical_sync_wait(0);
-                buttons = controllers_read(0);
-            } while ((buttons & 0x10) == 0);
+                buttons = pads_read();
+                if (xport_isquit())
+                    goto host_quit;
+            } while ((buttons & PADRup) == 0);
         }
         vertical_sync_wait(0);
         cd_audio_play();
         return 0;
     }
-    if (g_stage_index == 0x0b)
+    if (g_session.stage == 0x0b)
         return 0;
-    if ((g_held_buttons & 0x800) == 0 && g_pause_active == 0)
+    if ((g_input.held & PADstart) == 0 && pause_active == 0)
     {
-        g_pause_button_latched = 0;
+        g_input.pause_latched = 0;
         return 0;
     }
-    if (g_pause_button_latched != 0)
+    if (g_input.pause_latched != 0)
         return 0;
 
-    g_pause_button_latched = 1;
-    g_pause_active = 1;
+    g_input.pause_latched = 1;
+    pause_active = 1;
     sound_all_voices_stop();
     cd_audio_pause();
-    gpu_draw_sync(0);
-    g_render_frame_index ^= 1;
-    g_current_render_frame = g_render_frame_index ? &g_render_frame_buffer_0 : &g_render_frame_buffer_1;
-    drawenv_apply(&g_current_render_frame->drawenv);
-    text_render(player_assets_executable_text_pointer(0x800827ccu), -0x18, 0);
-    ot_submit(g_current_render_frame->ot + 1);
-    gpu_draw_sync(0);
+    DrawSync(0);
+    g_render_frame_idx ^= 1;
+    g_cur_render_frame = &g_render_frames[g_render_frame_idx ^ 1];
+    PutDrawEnv(&g_cur_render_frame->drawenv);
+    text_render(g_game_text.entries[99], -0x18, 0);
+    ot_submit(g_cur_render_frame->ot + 1);
+    DrawSync(0);
 
     for (;;)
     {
-        buttons = controllers_read(0);
-        if ((buttons & 0x800) == 0)
+        buttons = pads_read();
+        if (xport_isquit())
+            goto host_quit;
+        if ((buttons & PADstart) == 0)
             break;
         vertical_sync_wait(0);
     }
@@ -282,41 +340,48 @@ sint32 pause_menu_update(void)
     do
     {
         vertical_sync_wait(0);
-        buttons = controllers_read(0);
-        g_held_buttons = buttons;
-        if ((buttons & 0x800) != 0 || g_pause_active == 0)
+        buttons = pads_read();
+        if (xport_isquit())
+            goto host_quit;
+        g_input.held = buttons;
+        if ((buttons & PADstart) != 0 || pause_active == 0)
         {
-            g_render_frame_index ^= 1;
-            g_current_render_frame = g_render_frame_index ? &g_render_frame_buffer_0 : &g_render_frame_buffer_1;
+            g_render_frame_idx ^= 1;
+            g_cur_render_frame = &g_render_frames[g_render_frame_idx ^ 1];
             cd_audio_play();
-            g_pause_active = 0;
+            pause_active = 0;
             return 1;
         }
-    } while (buttons != 0x10 || g_cd_file_io_enabled != 0);
+    } while (buttons != PADRup || g_cd_file_io_enabled != 0);
 
-    ot_submit(&g_current_render_frame->ot[0x480]);
-    gpu_draw_sync(0);
-    g_render_frame_index ^= 1;
-    g_current_render_frame = g_render_frame_index ? &g_render_frame_buffer_0 : &g_render_frame_buffer_1;
+    ot_submit(&g_cur_render_frame->ot[0x480]);
+    DrawSync(0);
+    g_render_frame_idx ^= 1;
+    g_cur_render_frame = &g_render_frames[g_render_frame_idx ^ 1];
     screenshot_capture();
-    g_pause_active = 0;
+    pause_active = 0;
     return 1;
+
+host_quit:
+    /* Host shutdown must leave the blocking input loop */
+    pause_active = 0;
+    return 0;
 }
 
 /* Original: FUN_8008B6D4. */
-void debug_player_cell_coordinates_draw(void)
+static void debug_player_cell_coords_draw(void)
 {
     char text[32];
-    sint32 value;
-    snprintf(text, sizeof(text), "%d", g_player_world_x / 0x4000);
+    sint32 val;
+    snprintf(text, sizeof(text), "%d", g_player_world.x / 0x4000);
     text_render(text, 0x6e, 0);
-    value = g_player_world_y / 0x4000;
-    if (value < 0)
-        value = -value;
-    snprintf(text, sizeof(text), "%d", value);
+    val = g_player_world.y / 0x4000;
+    if (val < 0)
+        val = -val;
+    snprintf(text, sizeof(text), "%d", val);
     text_render(text, 0x6e, 0x10);
-    value = g_map_depth_cells - (((g_map_depth_cells * 0xc0 - g_player_world_z / 0x100) / 0x40) + 1);
-    snprintf(text, sizeof(text), "%d", value);
+    val = g_map.depth - (((g_map.depth * 0xc0 - g_player_world.z / 0x100) / 0x40) + 1);
+    snprintf(text, sizeof(text), "%d", val);
     text_render(text, 0x6e, 0x20);
 }
 
@@ -325,14 +390,14 @@ void debug_input_update(void)
 {
     if (g_debug_cheats_enabled == 0)
         return;
-    if (g_debug_coordinates_visible != 0)
-        debug_player_cell_coordinates_draw();
-    if ((g_held_buttons & 0xffff0000u) != 0)
+    if (g_debug_coords_visible != 0)
+        debug_player_cell_coords_draw();
+    if ((g_input.held & 0xffff0000u) != 0)
     {
-        if (g_stage_index != 0x0b && g_level_select_cheat_enabled != 0 && (g_pressed_buttons & 0x50000u) != 0)
+        if (g_session.stage != 0x0b && g_level_select_cheat_enabled != 0 && (g_input.pressed & 0x50000u) != 0)
             mission_complete_begin();
-        if ((g_pressed_buttons & 0x1000000u) != 0)
-            g_debug_coordinates_visible ^= 1;
+        if ((g_input.pressed & 0x1000000u) != 0)
+            g_debug_coords_visible ^= 1;
     }
 }
 
@@ -340,16 +405,16 @@ void debug_input_update(void)
  * not a world-camera transform: the game changes DISPENV.screen.y while
  * DAT_800D3EAC/B4/B8 remain unchanged. */
 /* Original: FUN_800901C8. */
-void display_shake_update(void)
+void disp_shake_update(void)
 {
-    sint16 count = g_display_shake_ticks;
-    sint32 index = count / 2;
-    sint16 screen_y = (sint16)(g_display_screen_y + camera_shake_curve[index]);
+    sint16 count = g_disp_shake_ticks;
+    sint32 idx = count / 2;
+    sint16 scr_y = g_render_state.disp_y + camera_shake_curve[idx];
 
-    g_current_render_frame->display_env.screen.y = screen_y;
-    psx_set_display_offset_y((sint32)screen_y - (sint32)g_display_screen_y);
+    g_cur_render_frame->disp_env.screen.y = scr_y;
+    psx_set_disp_offset_y(scr_y - g_render_state.disp_y);
     if (count != 0)
-        g_display_shake_ticks = (sint16)(count - 1);
+        g_disp_shake_ticks = (count - 1);
 }
 
 sint32 ot_depth_row_bucket(sint32 visible_row)
@@ -366,7 +431,7 @@ sint32 ot_depth_inherit_row_bucket(sint32 stored_bucket, sint32 row_bucket)
     return stored_bucket == 0 ? row_bucket : stored_bucket;
 }
 
-sint32 ot_depth_model_polygon_bucket(sint32 row_bucket, sint32 depth_reference_z, sint32 depth_anchor, sint32 polygon_max_vertex_z)
+static sint32 ot_depth_model_polygon_bucket(sint32 row_bucket, sint32 depth_reference_z, sint32 depth_anchor, sint32 polygon_max_vertex_z)
 {
     /* FUN_800924EC selects:
      *   main_ot + row_bucket - (trunc(DAT_800D3F08 / 256) - DAT_800D3F3C)
@@ -374,14 +439,14 @@ sint32 ot_depth_model_polygon_bucket(sint32 row_bucket, sint32 depth_reference_z
     return row_bucket - (div_256_trunc(depth_reference_z) - depth_anchor) + polygon_max_vertex_z;
 }
 
-sint32 ot_depth_should_swap_cell_objects(sint32 current_world_z, sint32 next_world_z)
+sint32 ot_depth_should_swap_cell_objects(sint32 cur_world_z, sint32 next_world_z)
 {
     /* FUN_80094548, 80094970..8009498C:
      *   slt v0,next_world_z,current_world_z
      *   beq v0,zero,no_swap
      * AddPrim prepends each submitted packet.  Ascending producer order is
      * therefore consumed by the GPU as the required far-to-near order. */
-    return next_world_z < current_world_z;
+    return next_world_z < cur_world_z;
 }
 
 sint32 ot_depth_run_self_tests(void)

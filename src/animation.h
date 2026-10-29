@@ -4,29 +4,50 @@
 #include "xport.h"
 #include "psx.h"
 
+typedef void (*ANIM_CALLBACK)(void *owner);
+
+typedef enum
+{
+    ANIM_SET_FRAME,
+    ANIM_STEP_FRAME,
+    ANIM_STOP,
+    ANIM_LOOP,
+    ANIM_CALL,
+    ANIM_TRANSLUCENCY,
+    ANIM_FLAGS_SET,
+    ANIM_SOUND_POSITIONAL,
+    ANIM_FLAGS_CLEAR,
+    ANIM_SOUND,
+    ANIM_FRAME_RANGE,
+    ANIM_RESET_FRAME,
+    ANIM_HOLD_FRAME,
+    ANIM_OP_COUNT
+} ANIM_OP;
+
 typedef struct
 {
-    uint32 next_address;
-    uint32 start_address;
+    ANIM_OP op;
+    sint32 args[3];
+    ANIM_CALLBACK callback;
+} ANIM_COMMAND;
+
+extern const ANIM_COMMAND g_static_frame_animation[1];
+
+typedef struct
+{
+    const ANIM_COMMAND *next;
+    const ANIM_COMMAND *start;
     sint32 frame;
     sint32 delay;
     sint32 frame_offset;
     uint16 flags;
-    uint16 reserved;
-    uint32 owner_address;
+    uint16 mirrored;
+    void *owner;
 } ANIM;
-
-typedef char AnimationCursor_size_1c[sizeof(ANIM) == 0x1c ? 1 : -1];
 
 /* BEGIN GENERATED MODULE API */
 GDB_CALL sint32 animation_update(ANIM *anim);
-const sint32 *animation_get_next(ANIM *anim);
-const sint32 *animation_get_start(ANIM *anim);
-void animation_rebase(ANIM *anim, const sint32 *script);
-void animation_set_next(ANIM *anim, const sint32 *p);
-void animation_set_owner(ANIM *anim, void *owner);
-void animation_set_start(ANIM *anim, const sint32 *p);
-void animation_start(ANIM *anim, const sint32 *script);
+void animation_start(ANIM *anim, const ANIM_COMMAND *script);
 /* END GENERATED MODULE API */
 
 #endif

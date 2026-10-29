@@ -1,38 +1,56 @@
-#include <stddef.h>
-#include "global.h"
+#include <stdlib.h>
+#include <string.h>
+
+#include "render.h"
 #include "resource_table.h"
 
-/* Variables. */
-/* Address-based resource registry recovered from FUN_8008CCE4/FUN_8008CD00. */
-
-static uint8 *resource_table[1024];
-
-/* Functions. */
-/* Original: SLES_004.74:FUN_8008CCE4.
- * Also used for host relocation, formerly resource_table_set_builtin;
- * that identical host helper had no separate original entry address. */
-void resource_table_register(uint32 resource_id, void *data)
+typedef struct
 {
-    uint32 index = resource_id >> 10;
-    if (index < sizeof(resource_table) / sizeof(resource_table[0]))
-        resource_table[index] = (uint8 *)data;
+    RESOURCE_DATA resource;
+    uint8 owns_data;
+} RESOURCE_SLOT;
+
+static RESOURCE_SLOT resource_table[RESOURCE_SLOT_COUNT];
+
+/* Original: SLES_004.74:FUN_8008CCE4. */
+void resource_table_register(uint32 resource_id, void *data, uint32 size, RESOURCE_STORAGE storage)
+{
+    uint32 idx = resource_id >> 10;
+    uint8 *copy = (uint8 *)data;
+    RESOURCE_SLOT *slot;
+    XASSERT(idx < RESOURCE_SLOT_COUNT);
+    if (data != 0 && storage == RESOURCE_COPY)
+    {
+        copy = (uint8 *)malloc(size);
+        XASSERT(!(copy == 0));
+        memcpy(copy, data, size);
+    }
+    slot = &resource_table[idx];
+    if (slot->owns_data)
+        free(slot->resource.data);
+    slot->resource.data = copy;
+    slot->resource.size = data != 0 ? size : 0;
+    slot->owns_data = data != 0 && storage == RESOURCE_COPY;
 }
 
 /* Original: FUN_8008CD00. */
 uint8 *animation_frame_resource(uint32 resource_id)
 {
-    uint8 *base = resource_table[resource_id >> 10];
-    uint8 *entry;
+    const RESOURCE_DATA *resource = resource_table_data(resource_id);
+    uint32 slot = ((resource_id & 0x3ff) + 1) * 4;
     uint32 offset;
-
-    if (base == NULL)
-        return NULL;
-    entry = base + (resource_id & 0x3ff) * 4 + 4;
-    offset = (uint32)entry[0] | (uint32)entry[1] << 8 | (uint32)entry[2] << 16 | (uint32)entry[3] << 24;
-    return entry + offset;
+    if (resource == 0 || slot > resource->size || resource->size - slot < 4)
+        return 0;
+    offset = xport_load_le32(resource->data + slot);
+    if (offset > resource->size - slot - 4)
+        return 0;
+    return resource->data + slot + offset;
 }
 
-uint8 *resource_table_data(uint32 resource_id)
+const RESOURCE_DATA *resource_table_data(uint32 resource_id)
 {
-    return resource_table[resource_id >> 10];
+    uint32 idx = resource_id >> 10;
+    if (idx >= RESOURCE_SLOT_COUNT || resource_table[idx].resource.data == 0)
+        return 0;
+    return &resource_table[idx].resource;
 }

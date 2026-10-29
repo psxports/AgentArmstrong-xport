@@ -1,63 +1,81 @@
-#include <stddef.h>
-#include "global.h"
-#include "stubs.h"
+#include <stdlib.h>
 
-/* Functions. */
-void input_record_append(sint32 input)
+#include "render.h"
+#include "input_record.h"
+
+INPUT_RECORD_STATE g_input_rec;
+/* Original: SLES_004.74:DAT_800D3CE4 */
+const char g_input_playback_label[5] = "DEMO";
+
+/* The current stage owns the stream allocation */
+void input_rec_heap_reset(void)
 {
-    sint32 *cursor = (sint32 *)g_input_record_cursor;
-    if ((uint8 *)g_input_record_buffer + 0x1000 < (uint8 *)g_input_record_cursor)
-        fatal_error("RECORD OVERFLOW");
+    g_input_rec.data = 0;
+    g_input_rec.size = g_input_rec.cursor = 0;
+}
 
-    if (input == g_input_run_value)
+/* Original: FUN_80095FE4. */
+void input_rec_append(sint32 input)
+{
+    uint32 limit = g_input_rec.size < 0x1000 ? g_input_rec.size : 0x1000;
+    uint32 words;
+    XASSERT(!(g_input_rec.data == 0 || g_input_rec.cursor > limit));
+    if (input == g_input_rec.run_val)
     {
-        g_input_run_length++;
+        g_input_rec.run_len = (g_input_rec.run_len + 1u);
         return;
     }
-    if (g_input_run_length == -1)
+    if (g_input_rec.run_len == -1)
     {
-        g_input_run_value = input;
-        g_input_run_length = 0;
+        g_input_rec.run_val = input;
+        g_input_rec.run_len = 0;
         return;
     }
-    if (g_input_run_length < 4)
+    if (g_input_rec.run_len < 4)
+        words = g_input_rec.run_len >= 0 ? g_input_rec.run_len + 1u : 0;
+    else
+        words = 3;
+    XASSERT(words <= (limit - g_input_rec.cursor) / 4);
+    if (g_input_rec.run_len < 4)
     {
-        while (g_input_run_length >= 0)
+        while (g_input_rec.run_len >= 0)
         {
-            *cursor++ = g_input_run_value;
-            g_input_record_cursor = cursor;
-            g_input_run_length--;
+            xport_store_le32(g_input_rec.data + g_input_rec.cursor, g_input_rec.run_val);
+            g_input_rec.cursor += 4;
+            --g_input_rec.run_len;
         }
     }
     else
     {
-        *cursor++ = 0xffff;
-        *cursor++ = g_input_run_length;
-        *cursor++ = g_input_run_value;
-        g_input_record_cursor = cursor;
+        xport_store_le32(g_input_rec.data + g_input_rec.cursor, 0xffff);
+        xport_store_le32(g_input_rec.data + g_input_rec.cursor + 4, g_input_rec.run_len);
+        xport_store_le32(g_input_rec.data + g_input_rec.cursor + 8, g_input_rec.run_val);
+        g_input_rec.cursor += 12;
     }
-    g_input_run_length = 0;
-    g_input_run_value = input;
+    g_input_rec.run_len = 0;
+    g_input_rec.run_val = input;
 }
 
 /* Original: FUN_800960FC. */
 sint32 input_playback_next(void)
 {
-    sint32 result = g_input_run_value;
-    sint32 *cursor = (sint32 *)g_input_record_cursor;
-    sint32 remaining = g_input_run_length - 1;
-    if (g_input_run_length == -1)
+    sint32 result;
+    if (g_input_rec.run_len == -1)
     {
-        result = *cursor++;
+        XASSERT(!(g_input_rec.data == 0 || g_input_rec.cursor > g_input_rec.size || g_input_rec.size - g_input_rec.cursor < 4));
+        result = xport_load_le32(g_input_rec.data + g_input_rec.cursor);
+        g_input_rec.cursor += 4;
         if (result == 0xffff)
         {
-            remaining = cursor[0] - 1;
-            g_input_run_value = cursor[1];
-            result = g_input_run_value;
-            cursor += 2;
+            XASSERT(g_input_rec.size - g_input_rec.cursor >= 8);
+            g_input_rec.run_len = (xport_load_le32(g_input_rec.data + g_input_rec.cursor) - 1);
+            g_input_rec.run_val = xport_load_le32(g_input_rec.data + g_input_rec.cursor + 4);
+            g_input_rec.cursor += 8;
+            result = g_input_rec.run_val;
         }
+        /* Ordinary words leave the original -1 run sentinel unchanged */
+        return result;
     }
-    g_input_run_length = remaining;
-    g_input_record_cursor = cursor;
-    return result;
+    g_input_rec.run_len = (g_input_rec.run_len - 1u);
+    return g_input_rec.run_val;
 }

@@ -1,5 +1,5 @@
-#ifndef AGENT_ARMSTRONG_VIDEO_H
-#define AGENT_ARMSTRONG_VIDEO_H
+#ifndef VIDEO_H
+#define VIDEO_H
 
 #include "xport.h"
 

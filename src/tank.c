@@ -1,13 +1,14 @@
-#include <stddef.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include "spatial.h"
+#include "game_math.h"
+#include "sprite.h"
+#include "render.h"
 #include "airship.h"
 #include "game_sound.h"
 #include "collision.h"
 #include "effect_update.h"
-#include "global.h"
+#include "map_render.h"
+#include "camera.h"
 #include "hq.h"
-#include "mechanoid.h"
 #include "mission.h"
 #include "model.h"
 #include "object.h"
@@ -18,303 +19,237 @@
 #include "tank.h"
 #include "truck.h"
 
+/* Original: DAT_800D4054. */
+MODEL_POSE_RESOURCE g_tank_initial_pose;
+
+/* Original: DAT_800D404E. */
+sint16 g_tank_model_base;
+
 /* Types. */
 /* Resident PAL tank chain used by JUNGLE/M23.CC, exact ranges
  * 0x800ADB84..0x800AE7BC. */
 
 typedef struct
 {
-    COLLISION collision;              /* +0x000 */
-    sint16 health;                    /* +0x078 */
-    sint16 flash_clut_ticks;          /* +0x07A */
-    uint8 field_07c[4];               /* +0x07C */
-    sint32 velocity_x;                /* +0x080 */
-    sint32 target_velocity_x;         /* +0x084 */
-    uint8 field_088[0x10];            /* +0x088 */
-    sint32 target_heading;            /* +0x098 */
-    uint8 field_09c[4];               /* +0x09C */
-    sint32 velocity_z;                /* +0x0A0 */
-    sint32 target_velocity_z;         /* +0x0A4 */
-    sint32 acceleration;              /* +0x0A8 */
-    uint8 field_0ac[4];               /* +0x0AC */
-    sint16 fire_ticks;                /* +0x0B0 */
-    sint16 movement_sound_handle;     /* +0x0B2 */
-    sint16 field_0b4;                 /* +0x0B4 */
-    uint8 field_0b6[6];               /* +0x0B6 */
-    sint16 field_0bc;                 /* +0x0BC */
-    uint8 field_0be[2];               /* +0x0BE */
-    sint16 field_0c0;                 /* +0x0C0 */
-    sint16 field_0c2;                 /* +0x0C2 */
-    MODEL_NODE nodes[11];             /* +0x0C4 */
-    uint8 field_4e4[0x60];            /* +0x4E4 */
-    MODEL_NODE *node_table[11];       /* +0x544 */
-    uint8 field_570[8];               /* +0x570 */
-    EFFECT *owner_effect;             /* +0x578 */
-    sint16 heading_step;              /* +0x57C */
-    uint8 field_57e[2];               /* +0x57E */
-    sint32 patrol_min_x;              /* +0x580 */
-    sint32 patrol_max_x;              /* +0x584 */
-    sint32 saved_node3_translation_z; /* +0x588 */
-    EFFECT *route_points[16];         /* +0x58C */
-    sint16 route_count;               /* +0x5CC */
-    sint16 route_direction;           /* +0x5CE */
-    sint16 route_index;               /* +0x5D0 */
-    sint16 damage_smoke_active;       /* +0x5D2 */
-    uint8 field_5d4[0x18];            /* +0x5D4 */
-    sint32 movement_vector[3];        /* +0x5EC */
-    sint32 route_delta_x;             /* +0x5F8 */
-    uint8 field_5fc[4];               /* +0x5FC */
-    sint32 route_delta_z;             /* +0x600 */
+    COLLISION col;
+    sint32 velocity_x;
+    sint32 target_velocity_x;
+    sint32 target_heading;
+    sint32 velocity_z;
+    sint32 target_velocity_z;
+    sint32 acceleration;
+    sint16 fire_ticks;
+    sint16 movement_sound_handle;
+    MODEL_NODE nodes[11];
+    MODEL_NODE *node_table[11];
+    EFFECT *owner_effect;
+    sint16 heading_step;
+    EFFECT *route_points[16];
+    sint16 route_count;
+    sint16 route_dir;
+    sint16 route_idx;
+    sint16 damage_smoke_active;
+    /* Original 0x5EC DDA position followed by the three movement steps */
+    FIXED_DDA_LINE movement_line;
 } TANK_ACTOR;
 
-#if defined(AP_32BIT)
-typedef char TankActor_size_604[sizeof(TANK_ACTOR) == 0x604 ? 1 : -1];
-typedef char TankActor_nodes_at_c4[offsetof(TANK_ACTOR, nodes) == 0xC4 ? 1 : -1];
-typedef char TankActor_table_at_544[offsetof(TANK_ACTOR, node_table) == 0x544 ? 1 : -1];
-typedef char TankActor_routes_at_58c[offsetof(TANK_ACTOR, route_points) == 0x58C ? 1 : -1];
-#endif
-
-/* Macros. */
-#define fixed_dda_advance(p) fixed_dda_advance((sint32 *)(p))
+/* Original data: SLES_004.74:0x800CDA2C..0x800CDA36 */
+static const sint8 tank_model_offsets[11] = {
+    2, 1, 0, -1, -1, -1, -1, -1, -1, -1, -1,
+};
 
 /* Functions. */
-static sint32 qd(sint32 x, sint32 d)
-{
-    return x < 0 ? -((-x) / d) : x / d;
-}
-
 /* Original: FUN_800AE68C. */
-static void tank_damage(COLLISION *collision, COLLISION *hit)
+static void tank_damage(void *raw_col, void *raw_hit)
 {
-    TANK_ACTOR *o = (TANK_ACTOR *)collision;
+    TANK_ACTOR *actor = raw_col;
+    COLLISION *hit = raw_hit;
     void *blast;
     sint32 depth;
     if ((hit->receives_mask & 2) != 0)
         return;
-    o->flash_clut_ticks = 1;
-    if (object_damage_apply(o, hit))
+    actor->col.flash_clut_ticks = 1;
+    if (object_damage_apply(actor, hit))
     {
-        linked_list_unlink(g_object_list, o);
-        sound_voice_stop(&o->movement_sound_handle);
-        g_camera_depth_offset_target = 0;
-        --g_objective_counts[12];
-        depth = 0x480 - qd(g_render_row_world_z + 0x2600 - (o->collision.z + o->collision.box_z), 0x100);
-        blast = vehicle_destruction_actor_create(o->collision.x, o->collision.y, o->collision.z, &o->nodes[0], 11, (sint16)depth);
-        hierarchy_collision_box_update(blast, &o->nodes[7], 4);
-        sound_play_positional(0x67, -5, 0x8c, o->collision.x, o->collision.y, o->collision.z);
+        linked_list_unlink(&g_object_list, actor);
+        sound_voice_stop(&actor->movement_sound_handle);
+        g_camera.depth_offset_target = 0;
+        --g_mission.counts[12];
+        depth = 0x480 - div_trunc((g_map_render.depth_anchor_z + 0x2600u - ((uint32)actor->col.z + actor->col.box_z)), 0x100);
+        blast = vehicle_destruction_actor_create(actor->col.x, actor->col.y, actor->col.z, &actor->nodes[0], 11, depth);
+        hierarchy_col_box_update(blast, &actor->nodes[7], 4);
+        sound_play_positional(0x67, -5, 0x8c, actor->col.x, actor->col.y, actor->col.z);
     }
-    else if (o->health < 201)
-        o->damage_smoke_active = 1;
+    else if (actor->col.hit.health < 201)
+        actor->damage_smoke_active = 1;
 }
 
 /* Original: FUN_800ADD80. */
-static void tank_update(TANK_ACTOR *o)
+static void tank_update(void *raw_actor)
 {
+    TANK_ACTOR *actor = raw_actor;
     EFFECT *point;
-    void *x;
-    sint32 line[7], tx, tz, dx, dz, m, angle, depth;
-    static sint32 traced;
-#if defined(XPORT_NATIVE) && defined(_DEBUG)
-    if (!traced && getenv("OA_STAGE23_TRACE"))
+    const SOUND_VOLUME_PAIR *volume;
+    FIXED_DDA_LINE line;
+    sint32 tx, tz, dx, dz, m, angle, depth;
+    if (!world_object_is_visible(actor->col.x, actor->col.y, actor->col.z, 0x89800))
     {
-        uint8 before = g_objective_counts[12];
-        FILE *f = xport_fopen("../status/spank-the-tank-native.log", "a");
-        if (f)
-        {
-            fprintf(f, "TANK_NATIVE_UPDATE xyz=%d,%d,%d health=%d route=%d\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->route_index);
-            fclose(f);
-        }
-        o->collision.receives_mask = 0;
-        tank_damage(&o->collision, &o->collision);
-        f = xport_fopen("../status/spank-the-tank-native.log", "a");
-        if (f)
-        {
-            fprintf(f, "TANK_NATIVE_DAMAGE health=%d counter12_before=%u counter12_after=%u\n", o->health, (unsigned)before, (unsigned)g_objective_counts[12]);
-            fclose(f);
-        }
-        traced = 1;
-        return;
+        sound_voice_stop(&actor->movement_sound_handle);
+        object_destroy(actor);
+        actor->owner_effect->type = 0x36;
+        g_camera.depth_offset_target = 0;
     }
-#endif
-    if (!world_object_is_visible(o->collision.x, o->collision.y, o->collision.z, 0x89800))
-    {
-        sound_voice_stop(&o->movement_sound_handle);
-        object_destroy(o);
-        o->owner_effect->type = 0x36;
-        g_camera_depth_offset_target = 0;
-        return;
-    }
-    point = o->route_points[o->route_index];
+    point = actor->route_points[actor->route_idx];
     tx = point->x;
     tz = point->z;
-    if (tx - 0x4000 < o->collision.x && o->collision.x < tx + 0x4000 && tz - 0x4000 < o->collision.z && o->collision.z < tz + 0x4000)
+    if ((tx - 0x4000) < actor->col.x && actor->col.x < (tx + 0x4000) && (tz - 0x4000) < actor->col.z && actor->col.z < (tz + 0x4000))
     {
-        o->target_velocity_x = 0;
-        o->target_velocity_z = 0;
+        actor->target_velocity_x = 0;
+        actor->target_velocity_z = 0;
     }
-    if (tx - 0x800 < o->collision.x && o->collision.x < tx + 0x800 && tz - 0x800 < o->collision.z && o->collision.z < tz + 0x800)
+    if ((tx - 0x800) < actor->col.x && actor->col.x < (tx + 0x800) && (tz - 0x800) < actor->col.z && actor->col.z < (tz + 0x800))
     {
-        o->route_index += o->route_direction;
-        if (o->route_index == o->route_count - 1)
-            o->route_direction = -1;
-        if (o->route_index == 0)
-            o->route_direction = 1;
-        point = o->route_points[o->route_index];
-        fixed_dda_initialize(o->collision.x, o->collision.y, o->collision.z, point->x, o->collision.y, point->z, line);
-        angle = fixed_angle_from_vector(qd(line[3], 0x800), qd(line[5], 0x800)) << 2;
-        o->target_heading = angle;
-        o->heading_step = 1;
-        o->route_delta_x = qd(line[3], 16);
-        o->route_delta_z = qd(line[5], 16);
-        o->target_velocity_x = qd(o->route_delta_x * o->acceleration, 16);
-        o->target_velocity_z = qd(o->route_delta_z * o->acceleration, 16);
-        o->velocity_x = o->velocity_z = 0;
-        sound_play_positional(0x65, 0, 0x7f, o->collision.x, o->collision.y, o->collision.z);
-        if (!player_inventory_find(0x0b, g_player))
+        actor->route_idx += actor->route_dir;
+        if (actor->route_idx == actor->route_count - 1)
+            actor->route_dir = -1;
+        if (actor->route_idx == 0)
+            actor->route_dir = 1;
+        point = actor->route_points[actor->route_idx];
+        fixed_dda_initialize(actor->col.x, actor->col.y, actor->col.z, point->x, actor->col.y, point->z, &actor->movement_line);
+        angle = fixed_angle_from_vector(div_trunc(actor->movement_line.step.x, 0x800), div_trunc(actor->movement_line.step.z, 0x800)) << 2;
+        actor->target_heading = angle;
+        actor->heading_step = 1;
+        actor->movement_line.step.x = div_trunc(actor->movement_line.step.x, 16);
+        actor->movement_line.step.z = div_trunc(actor->movement_line.step.z, 16);
+        actor->target_velocity_x = div_trunc(actor->movement_line.step.x * actor->acceleration, 16);
+        actor->target_velocity_z = div_trunc(actor->movement_line.step.z * actor->acceleration, 16);
+        actor->velocity_x = actor->velocity_z = 0;
+        sound_play_positional(0x65, 0, 0x7f, actor->col.x, actor->col.y, actor->col.z);
+        INVENTORY_SLOT *inventory = player_inventory_find(0x0b, g_player);
+        if (inventory == 0 || inventory->count == 0)
         {
-            PLAYER_ACTION *item = player_action_object_create(o->collision.x, o->collision.y, o->collision.z, 0x0b);
-            if (item)
-                item->lifetime = 0x258;
+            PLAYER_ACTION *item = player_action_object_create(actor->col.x, actor->col.y, actor->col.z, 0x0b);
+            item->lifetime = 0x258;
         }
         if (g_player->health < 0x100)
         {
-            PLAYER_ACTION *item = player_action_object_create(o->collision.x - 0x4000, o->collision.y, o->collision.z, 0x15);
-            if (item)
-                item->lifetime = 0x258;
+            PLAYER_ACTION *item = player_action_object_create(actor->col.x - 0x4000u, actor->col.y, actor->col.z, 0x15);
+            item->lifetime = 0x258;
         }
     }
-    if ((uint16)((uint16)o->fire_ticks - 11) < 79)
+    if (actor->fire_ticks >= 11 && actor->fire_ticks < 90)
     {
-        fixed_dda_initialize(o->nodes[1].world_x, o->nodes[1].world_y, o->nodes[1].world_z, g_player_world_x, g_player_world_y - 0x3000, g_player_world_z, line);
-        angle = (fixed_angle_from_vector(qd(line[3], 0x800), qd(line[5], 0x800)) << 2) - o->nodes[0].rotation_y;
-        o->nodes[1].rotation_y = angle_approach_wrapped((sint16)(angle & 0xfff), 0x18, o->nodes[1].rotation_y);
-        if (o->fire_ticks == 0x59)
-            sound_play_positional(0x66, 0, 0x78, o->collision.x, o->collision.y, o->collision.z);
+        fixed_dda_initialize(actor->nodes[1].world_x, actor->nodes[1].world_y, actor->nodes[1].world_z, g_player_world.x, g_player_world.y - 0x3000u, g_player_world.z, &line);
+        angle = (fixed_angle_from_vector(div_trunc(line.step.x, 0x800), div_trunc(line.step.z, 0x800)) << 2) - actor->nodes[0].rotation_y;
+        actor->nodes[1].rotation_y = angle_approach_wrapped(angle & 0xfff, 0x18, actor->nodes[1].rotation_y);
+        if (actor->fire_ticks == 0x59)
+            sound_play_positional(0x66, 0, 0x78, actor->col.x, actor->col.y, actor->col.z);
     }
-    if (o->nodes[0].rotation_y == o->target_heading)
+    if (actor->nodes[0].rotation_y == actor->target_heading)
     {
-        fixed_dda_advance(o->movement_vector);
-        o->collision.x += o->velocity_x;
-        o->collision.z += o->velocity_z;
-        dx = abs_s32(qd(o->route_delta_x, 0x100));
-        dz = abs_s32(qd(o->route_delta_z, 0x100));
-        if (o->velocity_x < o->target_velocity_x)
-            o->velocity_x += dx;
-        if (o->target_velocity_x < o->velocity_x)
-            o->velocity_x -= dx;
-        if (o->velocity_z < o->target_velocity_z)
-            o->velocity_z += dz;
-        if (o->target_velocity_z < o->velocity_z)
-            o->velocity_z -= dz;
+        fixed_dda_advance(&actor->movement_line);
+        actor->col.x = (uint32)actor->col.x + actor->velocity_x;
+        actor->col.z = (uint32)actor->col.z + actor->velocity_z;
+        dx = abs_s32(div_trunc(actor->movement_line.step.x, 0x100));
+        dz = abs_s32(div_trunc(actor->movement_line.step.z, 0x100));
+        if (actor->velocity_x < actor->target_velocity_x)
+            actor->velocity_x += dx;
+        if (actor->target_velocity_x < actor->velocity_x)
+            actor->velocity_x -= dx;
+        if (actor->velocity_z < actor->target_velocity_z)
+            actor->velocity_z += dz;
+        if (actor->target_velocity_z < actor->velocity_z)
+            actor->velocity_z -= dz;
     }
     else
     {
-        o->nodes[0].rotation_y = angle_approach_wrapped((sint16)o->target_heading, o->heading_step, o->nodes[0].rotation_y);
-        if (o->heading_step < 12 && (g_frame_counter & 3) == 0)
-            ++o->heading_step;
+        actor->nodes[0].rotation_y = angle_approach_wrapped(actor->target_heading, actor->heading_step, actor->nodes[0].rotation_y);
+        if (actor->heading_step < 12 && (g_render_state.frame & 3) == 0)
+            ++actor->heading_step;
     }
-    o->nodes[0].translation_x = o->collision.x - g_camera_world_x;
-    o->nodes[0].translation_y = o->collision.y - g_camera_world_y;
-    o->nodes[0].translation_z = o->collision.z - g_camera_world_z;
-    fixed_dda_initialize(o->nodes[4].world_x, o->nodes[4].world_y, o->nodes[4].world_z, g_player_world_x, g_player_world_y, g_player_world_z, line);
-    m = abs_s32(line[3]);
-    dz = abs_s32(line[5]);
-    m = m < dz ? dz + m / 2 : m + dz / 2;
-    angle = fixed_angle_from_vector(qd(line[4], 0x800), -abs_s32(qd(m, 0x800))) << 2;
-    o->nodes[4].rotation_x = angle_approach_wrapped((sint16)((angle - 0x400) & 0xffc), 12, o->nodes[4].rotation_x);
-    g_model_render_frame = 0;
+    actor->nodes[0].translation_x = (uint32)actor->col.x - g_camera.world_x;
+    actor->nodes[0].translation_y = (uint32)actor->col.y - g_camera.world_y;
+    actor->nodes[0].translation_z = (uint32)actor->col.z - g_camera.world_z;
+    fixed_dda_initialize(actor->nodes[4].world_x, actor->nodes[4].world_y, actor->nodes[4].world_z, g_player_world.x, g_player_world.y, g_player_world.z, &line);
+    m = abs_s32(line.step.x);
+    dz = abs_s32(line.step.z);
+    m = m < dz ? dz + (uint32)div_pow2_trunc(m, 1) : m + (uint32)div_pow2_trunc(dz, 1);
+    angle = fixed_angle_from_vector(div_trunc(line.step.y, 0x800), -abs_s32(div_trunc(m, 0x800))) << 2;
+    actor->nodes[4].rotation_x = angle_approach_wrapped((angle - 0x400) & 0xffc, 12, actor->nodes[4].rotation_x);
+    g_model_draw.target_frame = 0;
     model_render_begin();
-    hierarchy_collision_box_update(o, &o->nodes[7], 4);
-    depth = g_render_row_world_z + 0x2600 - (o->collision.z + o->collision.box_z);
-    g_render_depth_bucket = 0x480 - qd(depth, 0x100);
-    g_current_model_world_z = o->collision.z;
-    if (o->flash_clut_ticks)
+    hierarchy_col_box_update(&actor->col, &actor->nodes[7], 4);
+    depth = g_map_render.depth_anchor_z + 0x2600u - ((uint32)actor->col.z + actor->col.box_z);
+    g_model_draw.depth_bucket = 0x480 - div_trunc(depth, 0x100);
+    g_model_draw.world_z = actor->col.z;
+    if (actor->col.flash_clut_ticks)
     {
-        g_model_clut_override = g_hit_flash_clut;
-        --o->flash_clut_ticks;
+        g_model_draw.clut_override = g_spr_pal.hit_flash;
+        --actor->col.flash_clut_ticks;
     }
-    model_render_node(&o->nodes[0], (MATRIX *)player_assets_executable_address(0x800c8decu));
-    g_model_clut_override = 0;
+    model_render_node(&actor->nodes[0], &g_model_identity);
+    g_model_draw.clut_override = 0;
     model_render_end();
-    if (o->fire_ticks == 1)
+    if (actor->fire_ticks == 1)
     {
-        PROJECTILE *p = projectile_create(o->nodes[5].world_x, o->nodes[5].world_y, o->nodes[5].world_z, o->nodes[6].world_x, o->nodes[6].world_y, o->nodes[6].world_z);
-        sound_play_positional(0x67, 0, 0x96, o->collision.x, o->collision.y, o->collision.z);
-        if (p)
-        {
-            p->damage = 0x80;
-            p->floor_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_trail_update;
-            p->impact_callback = (FUNC_COLLISION_UPDATE)explosive_projectile_impact;
-            p->collision.sends_mask |= 1;
-            p->collision.receives_mask |= 4;
-            p->collision.object_type = 0;
-        }
+        PROJECTILE *projectile;
+        sound_play_positional(0x67, 0, 0x96, actor->col.x, actor->col.y, actor->col.z);
+        projectile = projectile_create(actor->nodes[5].world_x, actor->nodes[5].world_y, actor->nodes[5].world_z, actor->nodes[6].world_x, actor->nodes[6].world_y, actor->nodes[6].world_z);
+        projectile->col.hit.damage = 0x80;
+        projectile->floor_callback = explosive_projectile_trail_update;
+        projectile->impact_callback = explosive_projectile_impact;
+        projectile->col.sends_mask |= 1;
+        projectile->col.object_type = 0;
+        projectile->col.receives_mask |= 4;
         speech_random_request(6);
     }
-    if (o->fire_ticks == 0)
-        o->fire_ticks = (sint16)(random_range(100) + 130);
-    --*(uint16 *)&o->fire_ticks;
-    if (o->damage_smoke_active && (g_frame_counter & 7) == 0)
-        timed_callback_create(expl_debris_particle_create, o->collision.x, o->collision.y, o->collision.z, 8, 2);
-    if (o->movement_sound_handle != -1)
+    if (actor->fire_ticks == 0)
+        actor->fire_ticks = random_range(100) + 130;
+    --actor->fire_ticks;
+    if (actor->damage_smoke_active && (g_render_state.frame & 7) == 0)
+        timed_callback_create(expl_debris_particle_create, actor->col.x, actor->col.y, actor->col.z, 8, 2);
+    if (actor->movement_sound_handle != -1)
     {
-        x = sound_spatial_volume_calculate(0x7f, o->collision.x, o->collision.y, o->collision.z);
-        if (x)
-            sound_voice_spatial_volume_update(x, o->movement_sound_handle);
+        volume = sound_spatial_volume_calculate(0x7f, actor->col.x, actor->col.y, actor->col.z);
+        if (volume)
+            sound_voice_spatial_volume_update(volume, actor->movement_sound_handle);
     }
-    g_camera_depth_offset_target = o->collision.z < g_player_world_z ? 0x40 : 0;
-    hud_bar_render(g_boss_health_bar, o->health, 0, 0);
+    g_camera.depth_offset_target = actor->col.z < g_player_world.z ? 0x40 : 0;
+    hud_bar_render(&g_boss_health_bar, actor->col.hit.health, 0, 0);
 }
 
 /* Original: FUN_800ADB84. */
-void tank_create(EFFECT *e)
+void tank_create(EFFECT *effect)
 {
-    TANK_ACTOR *o = (TANK_ACTOR *)runtime_heap_allocate(sizeof(*o));
-    const sint8 *idx = (const sint8 *)player_assets_executable_address(0x800cda2c);
+    TANK_ACTOR *actor;
     sint32 i;
-    e->type = 0;
-    o->collision.update = (FUNC_COLLISION_UPDATE)tank_update;
-    linked_list_append(g_object_list, o);
+    effect->type = 0;
+    actor = runtime_heap_allocate(sizeof(*actor));
+    actor->col.object.update = tank_update;
+    linked_list_append(&g_object_list, actor);
     for (i = 0; i < 11; i++)
     {
-        MODEL_NODE *n = &o->nodes[i];
-        o->node_table[i] = n;
-        n->model_id = idx[i] == -1 ? 0 : g_tank_model_base + idx[i];
-        n->render_flags = 0x3f;
+        MODEL_NODE *node = &actor->nodes[i];
+        actor->node_table[i] = node;
+        node->model_id = tank_model_offsets[i] == -1 ? 0 : g_tank_model_base + tank_model_offsets[i];
+        node->pose_enabled = 0x3f;
     }
-    model_initialize_pose(g_tank_initial_pose, o->node_table, 1);
-    o->owner_effect = e;
-    o->collision.z = e->z;
-    o->collision.x = e->x;
-    o->collision.y = e->y - 0xe00;
-    o->collision.receives_mask = 0x43;
-    o->collision.callback_18 = (FUNC_COLLISION_CALLBACK)tank_damage;
-    o->collision.callback_14 = player_apply_damage;
-    o->health = 0x258;
-    o->nodes[0].scale = 0xc00;
-    o->fire_ticks = 0xfa;
-    o->field_0b4 = -1;
-    o->patrol_max_x = e->x + 0x10a00;
-    o->saved_node3_translation_z = o->nodes[3].translation_z;
-    o->patrol_min_x = e->x - 0x10a00;
-    o->field_0bc = 0x10;
-    o->field_0c0 = 500;
-    o->field_0c2 = 200;
-    o->route_points[0] = e;
-    o->route_count = (sint16)(route_waypoints_collect((sint16)e->values[0], 0, (void **)o->route_points) + 1);
-    o->route_direction = 1;
-    o->movement_sound_handle = (sint16)sound_play_positional(0x64, 0, 0x7f, o->collision.x, o->collision.y, o->collision.z);
-    o->acceleration = 3;
-    hud_bar_initialize(g_boss_health_bar, -0x28, -0x60, 0x50, 0x258);
-#if defined(XPORT_NATIVE) && defined(_DEBUG)
-    if (getenv("OA_STAGE23_TRACE"))
-    {
-        FILE *f = xport_fopen("../status/spank-the-tank-native.log", "w");
-        if (f)
-        {
-            fprintf(f, "TANK_NATIVE_CTOR xyz=%d,%d,%d health=%d route_count=%d damage=800ae68c update=800add80\n", o->collision.x, o->collision.y, o->collision.z, o->health, o->route_count);
-            fclose(f);
-        }
-    }
-#endif
+    model_pose_init(&g_tank_initial_pose, actor->node_table, 11, 1);
+    actor->owner_effect = effect;
+    actor->col.z = effect->z;
+    actor->col.x = effect->x;
+    actor->col.y = effect->y - 0xe00u;
+    actor->col.receives_mask = 0x43;
+    actor->col.hit_callback_kind = COLLISION_CALLBACK_NOTIFY;
+    actor->col.hit_callback = tank_damage;
+    actor->col.player_contact_callback = player_apply_damage;
+    actor->col.hit.health = 0x258;
+    actor->nodes[0].scale = 0xc00;
+    actor->fire_ticks = 0xfa;
+    actor->route_points[0] = effect;
+    actor->route_count = route_waypoints_collect(effect->vals[0], 0, actor->route_points, sizeof(actor->route_points) / sizeof(actor->route_points[0])) + 1;
+    actor->route_dir = 1;
+    actor->movement_sound_handle = sound_play_positional(0x64, 0, 0x7f, actor->col.x, actor->col.y, actor->col.z);
+    actor->acceleration = 3;
+    hud_bar_initialize(&g_boss_health_bar, -0x28, -0x60, 0x50, 0x258);
 }

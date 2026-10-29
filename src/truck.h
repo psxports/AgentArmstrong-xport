@@ -14,4 +14,6 @@ void *vehicle_destruction_actor_create(sint32 x, sint32 y, sint32 z, MODEL_NODE 
 void truck_create(EFFECT *effect);
 /* END GENERATED MODULE API */
 
+extern sint16 g_truck_model_base;
+
 #endif
